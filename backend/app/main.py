@@ -12,7 +12,7 @@ from .utils.logging_setup import setup_logging
 
 setup_logging(settings.enable_file_logging)
 
-from .routers import config, document, outline, content, expand
+from .routers import config, document, outline, content, expand, review, merge
 
 # 创建FastAPI应用实例
 app = FastAPI(
@@ -25,7 +25,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_credentials=False,  # Wildcard origins require credentials=False
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -36,6 +36,8 @@ app.include_router(document.router)
 app.include_router(outline.router)
 app.include_router(content.router)
 app.include_router(expand.router)
+app.include_router(review.router)
+app.include_router(merge.router)
 
 
 # 健康检查端点

@@ -33,9 +33,15 @@ class ConfigManager:
 
         return default_config
 
-    def save_config(self, api_key: str, base_url: str, model_name: str) -> bool:
+    def save_config(self, api_key: str, base_url: str, model_name: str, provider: str = None, provider_keys: dict = None, provider_models: dict = None) -> bool:
         """保存配置到本地JSON文件"""
         config = {"api_key": api_key, "base_url": base_url, "model_name": model_name}
+        if provider:
+            config["provider"] = provider
+        if provider_keys:
+            config["provider_keys"] = provider_keys
+        if provider_models:
+            config["provider_models"] = provider_models
 
         try:
             with open(self.config_file, "w", encoding="utf-8") as f:

@@ -14,15 +14,18 @@ from ..utils.openai_util import OpenAIUtil, ProgressCallback
 from ..utils.errors import AppError
 from ..utils.prompts.outline_prompts import (
     extract_requirement_groups_messages,
+    extract_framework_groups_messages,
     generate_aligned_children_outline_prompt,
     generate_aligned_children_outline_with_old_prompt,
     generate_children_outline_prompt,
     generate_children_outline_with_old_prompt,
+    generate_framework_children_outline_prompt,
     generate_outline_prompt,
     generate_outline_with_old_prompt,
     generate_top_level_outline_prompt,
     generate_top_level_outline_with_old_prompt,
     review_aligned_outline_messages,
+    review_framework_outline_messages,
     review_outline_messages,
 )
 
@@ -40,6 +43,7 @@ class OutlineService:
         mode: OutlineMode = OutlineMode.FREE,
         uploaded_expand: bool = False,
         old_outline: str | None = None,
+        framework_structure: str | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> Dict[str, Any]:
         """生成目录结构。"""
@@ -49,6 +53,15 @@ class OutlineService:
                 requirements=requirements,
                 uploaded_expand=uploaded_expand,
                 old_outline=old_outline,
+                progress_callback=progress_callback,
+            )
+
+        if mode == OutlineMode.FRAMEWORK:
+            if not framework_structure:
+                raise AppError("框架结构模式需要提供投标文件框架结构", status_code=400)
+            return await self._generate_framework_outline_workflow(
+                overview=overview,
+                framework_structure=framework_structure,
                 progress_callback=progress_callback,
             )
 
@@ -726,6 +739,201 @@ class OutlineService:
 
         if cls._outline_depth(outline) < 3:
             raise ValueError("完整目录至少需要三级结构")
+
+    # ============================================================
+    # 框架结构模式 (FRAMEWORK) — 严格按招标文件规定的框架生成
+    # ============================================================
+
+    async def _generate_framework_outline_workflow(
+        self,
+        overview: str,
+        framework_structure: str,
+        progress_callback: ProgressCallback | None = None,
+    ) -> Dict[str, Any]:
+        """按招标文件规定的框架结构严格生成目录。"""
+        await self.ai.emit_progress(progress_callback, "开始提取框架结构分组。")
+        groups = await self._extract_framework_groups(
+            framework_structure=framework_structure,
+            progress_callback=progress_callback,
+        )
+
+        await self.ai.emit_progress(
+            progress_callback, "框架分组提取完成，正在构建一级目录。"
+        )
+        first_outline = await self._generate_framework_outline(
+            overview=overview,
+            groups=groups,
+            progress_callback=progress_callback,
+        )
+
+        await self.ai.emit_progress(
+            progress_callback, "目录生成完成，正在审核与框架的对应关系。"
+        )
+        first_review = await self._review_framework_outline(
+            overview=overview,
+            framework_structure=framework_structure,
+            groups=groups,
+            outline=first_outline,
+            progress_callback=progress_callback,
+            stage_label="首次审核",
+        )
+        if first_review["passed"]:
+            await self.ai.emit_progress(progress_callback, "目录审核通过，准备返回结果。")
+            return first_outline
+
+        suggestions = first_review.get("suggestions") or [
+            "请保持一级目录与框架分组标题完全一致，并补全各分组下遗漏的条目。"
+        ]
+        await self.ai.emit_progress(
+            progress_callback,
+            "目录审核未通过，正在根据修改建议重新提取框架分组并重新生成目录。",
+        )
+
+        try:
+            revised_groups = await self._extract_framework_groups(
+                framework_structure=framework_structure,
+                progress_callback=progress_callback,
+                suggestions=suggestions,
+            )
+            second_outline = await self._generate_framework_outline(
+                overview=overview,
+                groups=revised_groups,
+                progress_callback=progress_callback,
+                suggestions=suggestions,
+            )
+        except AppError:
+            await self.ai.emit_progress(
+                progress_callback,
+                "根据审核建议重新生成失败，已回退到首次生成结果。",
+            )
+            return first_outline
+
+        await self.ai.emit_progress(progress_callback, "二次生成完成，开始最终审核。")
+        second_review = await self._review_framework_outline(
+            overview=overview,
+            framework_structure=framework_structure,
+            groups=revised_groups,
+            outline=second_outline,
+            progress_callback=progress_callback,
+            stage_label="最终审核",
+        )
+        if second_review["passed"]:
+            await self.ai.emit_progress(
+                progress_callback, "最终审核通过，准备返回修正后的结果。"
+            )
+        else:
+            await self.ai.emit_progress(
+                progress_callback,
+                "最终审核未完全通过，已返回修正后的第二次结果。",
+            )
+
+        return second_outline
+
+    async def _extract_framework_groups(
+        self,
+        framework_structure: str,
+        progress_callback: ProgressCallback | None = None,
+        suggestions: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """从框架结构文本中提取一级分组。"""
+        response = await self.ai.collect_json_response(
+            messages=extract_framework_groups_messages(
+                framework_structure=framework_structure,
+                suggestions=suggestions,
+            ),
+            temperature=0.3,
+            schema=TechnicalRequirementGroupResponse,
+            validator=self._validate_requirement_groups,
+            progress_callback=progress_callback,
+            progress_label="框架分组",
+            failure_message="模型返回的框架分组格式无效",
+        )
+        return response.get("groups") or []
+
+    async def _generate_framework_outline(
+        self,
+        overview: str,
+        groups: list[dict[str, Any]],
+        progress_callback: ProgressCallback | None,
+        suggestions: list[str] | None = None,
+    ) -> Dict[str, Any]:
+        """基于框架分组生成严格对齐的完整目录。"""
+        top_level_items = self._build_top_level_outline_from_groups(groups)
+
+        assembled_items: list[dict[str, Any]] = []
+        for index, (item, group) in enumerate(zip(top_level_items, groups), start=1):
+            await self.ai.emit_progress(
+                progress_callback,
+                f"正在生成第 {index}/{len(top_level_items)} 个框架分组的子目录：{item.get('title', '未命名章节')}。",
+            )
+            merged_item = dict(item)
+            children_response = await self._generate_framework_children(
+                overview=overview,
+                parent_item=item,
+                framework_group=group,
+                suggestions=suggestions,
+                progress_callback=progress_callback,
+            )
+            children = children_response.get("children") or []
+            if children:
+                merged_item["children"] = children
+            assembled_items.append(merged_item)
+
+        outline = self._renumber_outline({"outline": assembled_items})
+        validated = OutlineResponse.model_validate(outline)
+        normalized = validated.model_dump(exclude_none=True)
+        return normalized
+
+    async def _generate_framework_children(
+        self,
+        overview: str,
+        parent_item: Dict[str, Any],
+        framework_group: Dict[str, Any],
+        suggestions: list[str] | None,
+        progress_callback: ProgressCallback | None,
+    ) -> Dict[str, Any]:
+        """为指定框架分组生成二三四级目录。"""
+        messages = generate_framework_children_outline_prompt(
+            overview=overview,
+            parent_item=parent_item,
+            framework_group=framework_group,
+            suggestions=suggestions,
+        )
+
+        return await self.ai.collect_json_response(
+            messages=messages,
+            temperature=0.7,
+            schema=OutlineChildrenResponse,
+            validator=self._validate_children_outline,
+            progress_callback=progress_callback,
+            progress_label=f"章节 {parent_item.get('title', '未命名章节')} 子目录",
+            failure_message="模型返回的目录数据格式无效",
+        )
+
+    async def _review_framework_outline(
+        self,
+        overview: str,
+        framework_structure: str,
+        groups: list[dict[str, Any]],
+        outline: Dict[str, Any],
+        progress_callback: ProgressCallback | None,
+        stage_label: str,
+    ) -> Dict[str, Any]:
+        """审核框架模式目录是否严格与框架结构对齐。"""
+        messages = review_framework_outline_messages(
+            overview=overview,
+            framework_structure=framework_structure,
+            groups_json=json.dumps({"groups": groups}, ensure_ascii=False),
+            outline_json=json.dumps(outline, ensure_ascii=False),
+        )
+        return await self.ai.collect_json_response(
+            messages=messages,
+            temperature=0.3,
+            schema=OutlineReviewResponse,
+            progress_callback=progress_callback,
+            progress_label=stage_label,
+            failure_message="模型返回的审核结果格式无效",
+        )
 
     @staticmethod
     def _validate_top_level_outline(payload: Dict[str, Any]) -> None:

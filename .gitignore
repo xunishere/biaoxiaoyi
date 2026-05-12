@@ -9,6 +9,7 @@ config.json
 uploads/
 *.docx
 *.pdf
+cloudflared
 
 # 构建和打包相关
 dist/

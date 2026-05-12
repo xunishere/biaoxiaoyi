@@ -8,6 +8,8 @@ def build_chapter_content_messages(
     parent_chapters: List[Dict[str, Any]] | None = None,
     sibling_chapters: List[Dict[str, Any]] | None = None,
     project_overview: str = "",
+    scoring_context: str = "",
+    framework_context: str = "",
 ) -> List[Dict[str, str]]:
     """构建章节正文生成消息。"""
     chapter_id = chapter.get("id", "unknown")
@@ -30,6 +32,16 @@ def build_chapter_content_messages(
     if project_overview.strip():
         messages.append(
             {"role": "user", "content": f"项目概述信息：\n{project_overview}"}
+        )
+
+    if scoring_context and scoring_context.strip():
+        messages.append(
+            {"role": "user", "content": f"评分标准（你的内容必须针对以下评分标准展开）：\n{scoring_context}"}
+        )
+
+    if framework_context and framework_context.strip():
+        messages.append(
+            {"role": "user", "content": f"本章节在招标文件框架中的位置：\n{framework_context}"}
         )
 
     if parent_chapters:

@@ -154,7 +154,34 @@ def generate_top_level_outline_with_old_prompt(
         },
     ]
 
+# def extract_requirement_groups_messages(
+#     requirements: str,
+#     suggestions: list[str] | None = None,
+# ) -> List[Dict[str, str]]:
+#     """提取适合作为一级目录的技术评分大类。"""
+#     system_prompt = """你是一个专业的招标文件分析专家。请从技术评分要求中提取适合作为技术标一级目录的评分大类。
 
+# 要求：
+# 1. 只提取技术评分大类，不要提取商务、报价、资质、售后服务等非技术类条目
+# 2. 每个大类都必须适合作为技术标一级目录标题，标题要专业、简洁、完整
+# 3. 同一大类下的细项、子项、分值说明、评分标准要归入 detail_points，不要拆成多个一级目录
+# 4. requirement_id 必须唯一，使用 R1、R2、R3 这种格式
+# 5. description 需要概括该大类关注的核心内容
+# 6. detail_points 中保留该大类下的关键评分细项，使用简洁短句
+# 7. 只返回 JSON，格式必须为 {"groups": [...]}，不要输出任何其他内容
+
+# JSON 格式要求：
+# {
+#   "groups": [
+#     {
+#       "requirement_id": "R1",
+#       "title": "",
+#       "description": "",
+#       "detail_points": ["", ""]
+#     }
+#   ]
+# }
+# """
 def extract_requirement_groups_messages(
     requirements: str,
     suggestions: list[str] | None = None,
@@ -163,7 +190,7 @@ def extract_requirement_groups_messages(
     system_prompt = """你是一个专业的招标文件分析专家。请从技术评分要求中提取适合作为技术标一级目录的评分大类。
 
 要求：
-1. 只提取技术评分大类，不要提取商务、报价、资质、售后服务等非技术类条目
+1. 提取所有在"技术部分"评分表中列出的评分大类
 2. 每个大类都必须适合作为技术标一级目录标题，标题要专业、简洁、完整
 3. 同一大类下的细项、子项、分值说明、评分标准要归入 detail_points，不要拆成多个一级目录
 4. requirement_id 必须唯一，使用 R1、R2、R3 这种格式
@@ -393,5 +420,156 @@ def review_aligned_outline_messages(
         {
             "role": "user",
             "content": "请判断该目录是否满足一一对应要求。若满足则返回 passed=true；若不满足则返回 passed=false，并给出具体修改建议。",
+        },
+    ]
+
+
+# ============================================================
+# 框架结构模式 (FRAMEWORK) — 严格按招标文件规定的框架生成目录
+# ============================================================
+
+
+def extract_framework_groups_messages(
+    framework_structure: str,
+    suggestions: list[str] | None = None,
+) -> List[Dict[str, str]]:
+    """从投标文件框架结构中提取一级目录分组。"""
+    system_prompt = """你是一个专业的招标文件分析专家。请从招标文件规定的「投标文件框架结构」中提取适合作为一级目录的章节分组。
+
+要求：
+1. 严格基于提供的框架结构文本，逐条提取所有一级分组和二级条目
+2. 一级分组的标题保持原文名称不变（如"资信部分"、"技术部分"等）
+3. 二级条目按原文编号和名称完整保留
+4. requirement_id 必须唯一，使用 F1、F2、F3 格式
+5. description 简要概括该分组的内容范围
+6. detail_points 列出该分组下的所有二级条目原文
+7. 只返回 JSON，格式必须为 {"groups": [...]}，不要输出任何其他内容
+
+JSON 格式要求：
+{
+  "groups": [
+    {
+      "requirement_id": "F1",
+      "title": "严格按原文的一级标题",
+      "description": "该分组内容范围概述",
+      "detail_points": ["二级条目1", "二级条目2"]
+    }
+  ]
+}
+"""
+
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"投标文件框架结构：\n{framework_structure}"},
+        {
+            "role": "user",
+            "content": "请提取所有一级分组和二级条目，一级标题保持原文不变。"
+            + _format_revision_suggestions(suggestions),
+        },
+    ]
+
+
+def generate_framework_children_outline_prompt(
+    overview: str,
+    parent_item: Dict[str, Any],
+    framework_group: Dict[str, Any],
+    suggestions: list[str] | None = None,
+) -> List[Dict[str, str]]:
+    """围绕指定框架分组，生成二三四级目录。"""
+    parent_id = parent_item.get("id", "1")
+    parent_title = parent_item.get("title", "未命名一级目录")
+    requirement_id = framework_group.get("requirement_id", "F1")
+    detail_points = framework_group.get("detail_points") or []
+    detail_lines = "\n".join(
+        f"- {item}" for item in detail_points if isinstance(item, str) and item.strip()
+    )
+
+    system_prompt = """你是一个专业的标书编写专家。请围绕指定的招标文件框架分组，为已经固定好的一级目录生成二级、三级和四级目录。
+
+要求：
+1. 一级目录标题已经固定，不能修改、重命名、合并或删除
+2. 只输出当前一级目录下的子目录，不要重复输出一级目录本身
+3. 二级目录必须严格对应框架分组下的各个条目，条目名称保留原文风格但如果原文只有编号（如"1."），需补全有意义的标题
+4. 三级目录对二级条目做进一步细分，四级目录做最细粒度的要点展开
+5. 每个节点必须包含 id、title、description，非叶子节点使用 children 字段
+6. 章节编号以给定的一级编号为前缀（如父级是 2，则子级从 2.1, 2.1.1, 2.1.1.1 依次展开）
+7. 四级目录是最小粒度，不再有 children
+8. 除了 JSON 结果外，不要输出任何其他内容
+
+JSON 格式示例：
+{
+  "children": [
+    {
+      "id": "2.1",
+      "title": "二级标题",
+      "description": "本节内容描述",
+      "children": [
+        {
+          "id": "2.1.1",
+          "title": "三级标题",
+          "description": "本节内容描述",
+          "children": [
+            {
+              "id": "2.1.1.1",
+              "title": "四级标题",
+              "description": "具体要点描述"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+"""
+
+    detail_content = detail_lines or "- 根据分组描述合理展开"
+
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"项目概述：\n{overview}"},
+        {
+            "role": "user",
+            "content": f"当前固定一级目录：\n编号：{parent_id}\n标题：{parent_title}",
+        },
+        {
+            "role": "user",
+            "content": f"当前对应的框架分组：\nrequirement_id：{requirement_id}\n标题：{framework_group.get('title', '')}\n描述：{framework_group.get('description', '')}\n框架规定的条目：\n{detail_content}",
+        },
+        {
+            "role": "user",
+            "content": f'请仅生成该一级目录下的二级、三级、四级目录，二级条目必须与框架规定的条目一一对应，返回格式必须是 {{"children": [...]}}。'
+            + _format_revision_suggestions(suggestions),
+        },
+    ]
+
+
+def review_framework_outline_messages(
+    overview: str,
+    framework_structure: str,
+    groups_json: str,
+    outline_json: str,
+) -> List[Dict[str, str]]:
+    """构建框架模式目录审核消息。"""
+    system_prompt = """你是一个严格的招标文件目录审核专家。请审核目录是否严格与招标文件规定的框架结构对齐。
+
+要求：
+1. 一级目录必须与框架结构中的一级分组一一对应，数量一致、顺序一致、标题必须完全一致
+2. 不允许缺失框架分组，也不允许新增、合并、改写一级目录
+3. 二级目录必须与框架规定的条目一一对应
+4. 三级和四级目录需合理展开，覆盖该条目下的必要内容
+5. 只返回 JSON，格式为：{"passed": true, "suggestions": []}
+6. 若不通过，suggestions 中必须给出具体、可执行的修改建议
+7. 除了 JSON 外，不要输出任何其他内容
+"""
+
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"项目概述：\n{overview}"},
+        {"role": "user", "content": f"招标文件规定的框架结构：\n{framework_structure}"},
+        {"role": "user", "content": f"提取的框架分组 JSON：\n{groups_json}"},
+        {"role": "user", "content": f"待审核目录 JSON：\n{outline_json}"},
+        {
+            "role": "user",
+            "content": "请判断该目录是否严格与框架结构对齐。若满足则返回 passed=true；若不满足则返回 passed=false，并给出具体修改建议。",
         },
     ]

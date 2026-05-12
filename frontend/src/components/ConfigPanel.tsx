@@ -1,9 +1,10 @@
 /**
- * 配置面板组件
+ * 配置面板组件 — 下拉式服务商选择 + 独立 Key 存储
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ConfigData } from '../types';
-import { configApi, getErrorMessage } from '../services/api';
+import { configApi } from '../services/api';
+import { PROVIDERS, matchProvider } from '../config/providers';
 
 interface ConfigPanelProps {
   config: ConfigData;
@@ -14,222 +15,258 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onConfigChange }) => 
   const [localConfig, setLocalConfig] = useState<ConfigData>(config);
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [fetchError, setFetchError] = useState('');
+
+  const selectedId = localConfig.provider || '';
+  const isCustom = selectedId === 'custom';
+  const selectedProvider = PROVIDERS.find((p) => p.id === selectedId);
+  const providerKey = (localConfig.provider_keys?.[selectedId]) || '';
 
   const loadConfig = React.useCallback(async () => {
     try {
       const response = await configApi.loadConfig();
       if (response.data) {
-        setLocalConfig(response.data);
-        onConfigChange(response.data);
+        const data = response.data;
+        if (!data.provider && data.base_url) {
+          const matched = matchProvider(data.base_url);
+          data.provider = matched ? matched.id : 'custom';
+        }
+        const pid = data.provider || '';
+        // 从缓存恢复模型列表
+        const cached = data.provider_models?.[pid] || [];
+        setModels(cached);
+        // 从 provider_keys 恢复 Key
+        if (pid && data.provider_keys?.[pid]) {
+          data.api_key = data.provider_keys[pid];
+        }
+        setLocalConfig(data);
+        onConfigChange(data);
+        lastSaved.current = snap(data);
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '加载配置失败') });
-    }
+    } catch { /* 静默 */ }
   }, [onConfigChange]);
 
-  useEffect(() => {
-    void loadConfig();
-  }, [loadConfig]);
+  useEffect(() => { void loadConfig(); }, [loadConfig]);
 
-  const handleSave = async () => {
-    try {
-      setLoading(true);
-      const response = await configApi.saveConfig(localConfig);
-
-      if (response.data.success) {
-        onConfigChange(localConfig);
-        setMessage({ type: 'success', text: '配置保存成功！' });
-        setTimeout(() => setMessage(null), 3000);
-      } else {
-        setMessage({ type: 'error', text: response.data.message || '配置保存失败' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: getErrorMessage(error, '配置保存失败') });
-    } finally {
-      setLoading(false);
+  const selectProvider = (id: string) => {
+    if (id === 'custom') {
+      const keys = localConfig.provider_keys || {};
+      const pm = localConfig.provider_models || {};
+      setLocalConfig({
+        ...localConfig,
+        provider: 'custom',
+        api_key: keys.custom || localConfig.api_key || '',
+      });
+      setModels(pm.custom || []);
+      return;
     }
+    const prov = PROVIDERS.find((p) => p.id === id);
+    if (!prov) return;
+    const keys = localConfig.provider_keys || {};
+    const pm = localConfig.provider_models || {};
+    const savedKey = keys[prov.id] || '';
+    const cached = pm[prov.id] || [];
+    setLocalConfig({
+      ...localConfig,
+      provider: prov.id,
+      api_key: savedKey,
+      base_url: prov.baseURL,
+      model_name: cached[0] || prov.defaultModel,
+    });
+    setModels(cached);
+  };
+
+  const setApiKey = (key: string) => {
+    const keys = { ...(localConfig.provider_keys || {}) };
+    if (selectedId) keys[selectedId] = key;
+    setLocalConfig({ ...localConfig, api_key: key, provider_keys: keys });
   };
 
   const handleGetModels = async () => {
-    if (!localConfig.api_key) {
-      setMessage({ type: 'error', text: '请先输入API Key' });
-      return;
-    }
-
+    if (!localConfig.api_key) return;
     try {
       setLoading(true);
+      setFetchError('');
       const response = await configApi.getModels(localConfig);
-      
       if (response.data.success) {
-        setModels(response.data.models);
-        // 如果当前选中的模型不在新的模型列表中，则选择第一个可用模型
-        if (response.data.models.length > 0 && !response.data.models.includes(localConfig.model_name)) {
-          setLocalConfig({ ...localConfig, model_name: response.data.models[0] });
+        const fetched = response.data.models;
+        if (fetched.length > 0) {
+          setModels(fetched);
+          const pm = { ...(localConfig.provider_models || {}) };
+          if (selectedId) pm[selectedId] = fetched;
+          setLocalConfig((prev) => {
+            const next = { ...prev, provider_models: pm };
+            if (!fetched.includes(prev.model_name)) {
+              next.model_name = fetched[0];
+            }
+            return next;
+          });
         }
-        setMessage({ type: 'success', text: `获取到 ${response.data.models.length} 个模型` });
-        setTimeout(() => setMessage(null), 3000);
       } else {
-        setMessage({ type: 'error', text: response.data.message });
+        setFetchError(response.data.message || '获取失败，请检查 Key');
       }
-    } catch (error) {
-        setMessage({ type: 'error', text: getErrorMessage(error, '获取模型列表失败') });
-      } finally {
-        setLoading(false);
-      }
+    } catch {
+      setFetchError('网络错误，请检查 Key 和 URL');
+    }
+    finally { setLoading(false); }
   };
+
+  // 自动保存：服务商/Key/模型变化时 debounce 1s 后保存
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSaved = useRef<string>('');
+
+  const snap = (cfg: ConfigData) => JSON.stringify({
+    api_key: cfg.api_key, base_url: cfg.base_url,
+    model_name: cfg.model_name, provider: cfg.provider,
+    provider_keys: cfg.provider_keys, provider_models: cfg.provider_models,
+  });
+
+  const autoSave = useCallback(async (cfg: ConfigData) => {
+    const s = snap(cfg);
+    if (s === lastSaved.current) return;
+    try {
+      const response = await configApi.saveConfig(cfg);
+      if (response.data.success) {
+        lastSaved.current = s;
+        onConfigChange(cfg);
+      }
+    } catch { /* 静默 */ }
+  }, [onConfigChange]);
+
+  useEffect(() => {
+    if (!localConfig.provider) return;
+    const s = snap(localConfig);
+    if (s === lastSaved.current) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => autoSave(localConfig), 500);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [localConfig, autoSave]);
 
   return (
     <div className="bg-white shadow-sm border-r border-gray-200 w-80 p-6 overflow-y-auto">
-      <div className="space-y-6">
-        {/* 标题 */}
+      <div className="space-y-5">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">AI写标书助手</h1>
+          <img src="/brand.png" alt="荟写作" className="w-full h-auto" />
           <hr className="mt-4 border-gray-200" />
         </div>
 
-        {/* 基本配置 */}
         <div>
-          <h2 className="text-lg font-medium text-gray-900 mb-4">⚙️ 基本配置</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="api_key" className="block text-sm font-medium text-gray-700">
-                OpenAI API Key
-              </label>
-              <input
-                type="password"
-                id="api_key"
-                value={localConfig.api_key}
-                onChange={(e) => setLocalConfig({ ...localConfig, api_key: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                placeholder="输入你的OpenAI API密钥"
-              />
-            </div>
+          <h2 className="text-base font-bold text-gray-800 text-center mb-4">
+            选择模型
+          </h2>
 
-            <div>
-              <label htmlFor="base_url" className="block text-sm font-medium text-gray-700">
-                Base URL (可选)
+          {/* 服务商下拉选择 */}
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">服务商</label>
+            <select
+              value={selectedId || ''}
+              onChange={(e) => selectProvider(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+            >
+              <option value="" disabled>请选择服务商</option>
+              {PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — {p.description}
+                </option>
+              ))}
+              <option value="custom">自定义</option>
+            </select>
+            {selectedProvider && (
+              <p className="text-xs text-blue-600 mt-1">
+                Base URL：{selectedProvider.baseURL}
+              </p>
+            )}
+          </div>
+
+          {/* API Key */}
+          <div className="mb-3">
+            <label htmlFor="api_key" className="block text-xs font-medium text-gray-700 mb-1">
+              API Key
+            </label>
+            <input
+              type="password"
+              id="api_key"
+              value={localConfig.api_key}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+              placeholder={selectedProvider ? `${selectedProvider.name} API Key` : '输入 API Key'}
+              autoComplete="new-password"
+            />
+            {selectedProvider && providerKey && (
+              <p className="text-xs text-green-600 mt-1">✅ 已保存 Key</p>
+            )}
+          </div>
+
+          {/* 自定义模式：Base URL 可编辑 */}
+          {isCustom && (
+            <div className="mb-3">
+              <label htmlFor="base_url" className="block text-xs font-medium text-gray-700 mb-1">
+                Base URL
               </label>
               <input
                 type="text"
                 id="base_url"
                 value={localConfig.base_url || ''}
                 onChange={(e) => setLocalConfig({ ...localConfig, base_url: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                placeholder="如果使用代理或其他服务，请输入base URL"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                placeholder="https://api.openai.com/v1"
               />
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* 模型配置 */}
-        <div>
-          <h3 className="text-base font-medium text-gray-900 mb-3">🤖 模型配置</h3>
-          
-          <button
-            onClick={handleGetModels}
-            disabled={loading}
-            className="w-full mb-3 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-gray-400"
-          >
-            {loading ? '获取中...' : '🔄 获取可用模型'}
-          </button>
-
-          <div>
-            <label htmlFor="model_name" className="block text-sm font-medium text-gray-700">
-              模型名称
-            </label>
+          {/* 模型选择 */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="model_name" className="text-xs font-medium text-gray-700">模型</label>
+              <button
+                onClick={handleGetModels}
+                disabled={loading || !localConfig.api_key}
+                className="text-xs text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+              >
+                {loading ? '获取中...' : '拉取列表'}
+              </button>
+            </div>
+            {fetchError && (
+              <p className="text-xs text-red-600 mt-1">{fetchError}</p>
+            )}
             {models.length > 0 ? (
               <select
                 id="model_name"
                 value={localConfig.model_name}
-                onChange={(e) => {
-                  setLocalConfig({ ...localConfig, model_name: e.target.value });
-                }}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                onChange={(e) => setLocalConfig({ ...localConfig, model_name: e.target.value })}
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
               >
-                {models.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
+                {models.map((m) => (
+                  <option key={m} value={m}>{m}</option>
                 ))}
               </select>
+            ) : selectedProvider ? (
+              <p className="text-sm text-gray-400 italic py-2">请先拉取模型列表</p>
             ) : (
-              <input
-                type="text"
-                id="model_name"
-                value={localConfig.model_name}
-                onChange={(e) => setLocalConfig({ ...localConfig, model_name: e.target.value })}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                placeholder="输入要使用的模型名称"
-              />
+              <p className="text-sm text-gray-400 italic py-2">请先选择服务商</p>
             )}
           </div>
+
+
         </div>
 
-        {/* 保存按钮 */}
-        <button
-          onClick={handleSave}
-          disabled={loading}
-          className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400"
-        >
-          {loading ? '保存中...' : '💾 保存配置'}
-        </button>
-
-        {/* 消息提示 */}
-        {message && (
-          <div className={`p-3 rounded-md text-sm ${
-            message.type === 'success' 
-              ? 'bg-green-100 text-green-700 border border-green-200' 
-              : 'bg-red-100 text-red-700 border border-red-200'
-          }`}>
-            {message.text}
-          </div>
-        )}
-
-        {/* 使用说明 */}
         <div className="border-t border-gray-200 pt-4">
-          <h3 className="text-sm font-medium text-gray-900 mb-2">📋 使用说明</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-2">使用说明</h3>
           <div className="text-sm text-gray-600 space-y-1">
-            <p>1. 配置API密钥和Base URL</p>
-            <p>2. 选择或输入模型名称</p>
-            <p>3. 按步骤完成标书编写流程</p>
+            <p>1. 选择服务商（URL 自动填充）</p>
+            <p>2. 输入 API Key（自动保存）</p>
+            <p>3. 选择模型</p>
+            <p>4. 开始写标书</p>
           </div>
         </div>
 
-        {/* 底部图标链接 */}
         <div className="border-t border-gray-200 pt-4">
-          <div className="flex items-center justify-center space-x-4">
-            {/* GitHub图标 */}
-            <a
-              href="https://github.com/yibiaoai/yibiao-simple"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-gray-700 transition-colors"
-              title="GitHub"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.30.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-            </a>
-            
-            {/* 易标图标 */}
-            <a
-              href="https://yibiao.pro"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:opacity-75 transition-opacity"
-              title="易标官网"
-            >
-              <img 
-                src="/yibiao.png" 
-                alt="易标" 
-                className="w-6 h-6" 
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </a>
+          <div className="flex items-center justify-center">
+            <img
+              src="/huixiezuo.png"
+              alt="荟写作"
+              className="w-5 h-5 opacity-50 hover:opacity-75 transition-opacity"
+            />
           </div>
         </div>
       </div>

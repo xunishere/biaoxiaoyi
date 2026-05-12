@@ -32,6 +32,7 @@ async def generate_outline(request: OutlineRequest):
             mode=request.mode,
             uploaded_expand=bool(request.uploaded_expand),
             old_outline=request.old_outline,
+            framework_structure=request.framework_structure,
         )
     except AppError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
@@ -63,6 +64,7 @@ async def generate_outline_stream(request: OutlineRequest):
                     mode=request.mode,
                     uploaded_expand=bool(request.uploaded_expand),
                     old_outline=request.old_outline,
+                    framework_structure=request.framework_structure,
                     progress_callback=progress_callback,
                 )
                 await queue.put(sse_result({"outline": outline}))

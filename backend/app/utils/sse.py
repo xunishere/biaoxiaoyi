@@ -65,3 +65,8 @@ def sse_error(message: str) -> str:
 def sse_done() -> str:
     """输出结束标记。"""
     return "data: [DONE]\n\n"
+
+
+def sse_keepalive() -> str:
+    """SSE 注释行，保持连接活跃（被 SSE 客户端忽略）。"""
+    return ": keepalive\n\n"

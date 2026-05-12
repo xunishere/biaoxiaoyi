@@ -6,6 +6,9 @@ export interface ConfigData {
   api_key: string;
   base_url?: string;
   model_name: string;
+  provider?: string;
+  provider_keys?: Record<string, string>;
+  provider_models?: Record<string, string[]>;  // API 拉取的模型列表缓存
 }
 
 export interface OutlineItem {
@@ -18,7 +21,7 @@ export interface OutlineItem {
   content?: string;
 }
 
-export type OutlineMode = 'free' | 'aligned';
+export type OutlineMode = 'free' | 'aligned' | 'framework';
 
 export interface OutlineData {
   outline: OutlineItem[];
@@ -32,5 +35,8 @@ export interface AppState {
   fileContent: string;
   projectOverview: string;
   techRequirements: string;
+  commercialRequirements: string;
+  bidFramework: string;
   outlineData: OutlineData | null;
+  frameworkOutlineData: OutlineData | null;
 }

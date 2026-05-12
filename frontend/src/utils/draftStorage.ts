@@ -1,22 +1,20 @@
 /**
- * 本地草稿持久化（localStorage）
- * 目标：刷新页面不丢失“标书解析/目录/正文”关键中间结果，方便调试与续写。
- *
- * 注意：localStorage 容量有限（通常 5-10MB），大正文可能触发 QUOTA_EXCEEDED_ERR。
- * 这里做了 try/catch，失败时不影响主流程。
+ * 本地草稿持久化
+ * - 元数据（outline/techRequirements 等）→ localStorage
+ * - 章节正文 → IndexedDB（容量大，不会像 localStorage 那样爆掉）
  */
 
 import type { AppState, OutlineItem } from '../types';
+import { idbStorage } from './idbStorage';
 
 const DRAFT_KEY = 'yibiao:draft:v1';
-const CONTENT_BY_ID_KEY = 'yibiao:contentById:v1';
 
 export type DraftState = Pick<
   AppState,
-  'currentStep' | 'fileContent' | 'projectOverview' | 'techRequirements' | 'outlineData'
+  'currentStep' | 'fileContent' | 'projectOverview' | 'techRequirements' | 'commercialRequirements' | 'bidFramework' | 'outlineData' | 'frameworkOutlineData'
 >;
 
-export type ContentById = Record<string, string>; // 章节id -> content
+export type ContentById = Record<string, string>;
 
 const safeJsonParse = <T,>(raw: string | null): T | null => {
   if (!raw) return null;
@@ -45,39 +43,29 @@ export const draftStorage = {
   clearAll() {
     try {
       localStorage.removeItem(DRAFT_KEY);
-      localStorage.removeItem(CONTENT_BY_ID_KEY);
     } catch (e) {
       console.warn('清空 localStorage 失败:', e);
     }
+    idbStorage.clearAll().catch(e => console.warn('清空 IndexedDB 失败:', e));
   },
 
-  loadContentById(): ContentById {
-    return safeJsonParse<ContentById>(localStorage.getItem(CONTENT_BY_ID_KEY)) || {};
-  },
-
-  saveContentById(contentById: ContentById) {
+  /** IndexedDB 读写：章节正文 */
+  async loadContentById(): Promise<ContentById> {
     try {
-      localStorage.setItem(CONTENT_BY_ID_KEY, JSON.stringify(contentById));
+      return await idbStorage.getAllContent();
     } catch (e) {
-      console.warn('保存正文内容失败（可能是 localStorage 空间不足）:', e);
+      console.warn('读取章节内容失败:', e);
+      return {};
     }
   },
 
-  upsertChapterContent(chapterId: string, content: string) {
-    try {
-      const map = draftStorage.loadContentById();
-      map[chapterId] = content;
-      draftStorage.saveContentById(map);
-    } catch (e) {
-      console.warn('保存章节内容失败:', e);
-    }
+  async upsertChapterContent(chapterId: string, content: string) {
+    return idbStorage.setContent(chapterId, content);
   },
 
-  /**
-   * 按当前 outline 的叶子节点过滤 contentById，避免目录变更后错误回填。
-   */
-  filterContentByOutlineLeaves(outline: OutlineItem[]): ContentById {
-    const map = draftStorage.loadContentById();
+  /** 按 outline 叶子节点过滤（从 IndexedDB 读取） */
+  async filterContentByOutlineLeaves(outline: OutlineItem[]): Promise<ContentById> {
+    const map = await draftStorage.loadContentById();
     const leafIds = new Set<string>();
     const walk = (items: OutlineItem[]) => {
       items.forEach((it) => {

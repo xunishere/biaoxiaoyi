@@ -24,6 +24,8 @@ async def generate_chapter_content(request: ChapterContentRequest):
             parent_chapters=request.parent_chapters,
             sibling_chapters=request.sibling_chapters,
             project_overview=request.project_overview,
+            scoring_context=request.scoring_context,
+            framework_context=request.framework_context,
         )
         return {"success": True, "content": content}
     except AppError as exc:
@@ -48,13 +50,15 @@ async def generate_chapter_content_stream(request: ChapterContentRequest):
                 parent_chapters=request.parent_chapters,
                 sibling_chapters=request.sibling_chapters,
                 project_overview=request.project_overview,
+                scoring_context=request.scoring_context,
+                framework_context=request.framework_context,
             ):
                 yield sse_chunk(chunk)
         except AppError as exc:
             yield sse_error(exc.message)
-        except Exception:
+        except Exception as exc:
             logger.exception("章节内容流式生成失败")
-            yield sse_error("章节内容生成失败，请稍后重试")
+            yield sse_error(f"章节内容生成失败: {exc}")
         finally:
             yield sse_done()
 

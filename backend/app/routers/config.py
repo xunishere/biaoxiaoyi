@@ -21,6 +21,9 @@ async def save_config(config: ConfigRequest):
             api_key=config.api_key,
             base_url=config.base_url or "",
             model_name=config.model_name,
+            provider=config.provider,
+            provider_keys=config.provider_keys,
+            provider_models=config.provider_models,
         )
 
         if success:
@@ -57,6 +60,9 @@ async def get_available_models(config: ConfigRequest):
             api_key=config.api_key,
             base_url=config.base_url,
             model_name=config.model_name,
+            provider=config.provider,
+            provider_keys=config.provider_keys,
+            provider_models=config.provider_models,
         )
 
         if not temp_saved:

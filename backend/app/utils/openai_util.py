@@ -32,6 +32,7 @@ class OpenAIUtil:
         self.client = openai.AsyncOpenAI(
             api_key=self.api_key,
             base_url=self.base_url or None,
+            timeout=300.0,
         )
 
     def _chat_endpoint_url(self) -> str:
@@ -221,6 +222,7 @@ class OpenAIUtil:
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         response_format: dict | None = None,
+        max_tokens: int | None = None,
     ) -> AsyncGenerator[str, None]:
         """流式调用聊天完成接口。"""
         request_id = uuid.uuid4().hex
@@ -239,6 +241,7 @@ class OpenAIUtil:
                     if response_format is not None
                     else {}
                 ),
+                **({"max_tokens": max_tokens} if max_tokens is not None else {}),
             )
         except Exception as exc:
             self._log_ai_error(
@@ -272,6 +275,12 @@ class OpenAIUtil:
                 exc,
             )
             raise AppError(f"模型调用失败: {exc}", status_code=502) from exc
+        finally:
+            # 确保关闭 stream，防止连接泄露
+            try:
+                await stream.close()
+            except Exception:
+                pass
 
         self._log_ai_response(request_id, "".join(parts))
         self._log_ai_raw_response(request_id, raw_chunks, "".join(parts))

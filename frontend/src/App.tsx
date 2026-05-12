@@ -17,6 +17,10 @@ function App() {
     updateStep,
     updateFileContent,
     updateAnalysisResults,
+    updateCommercialRequirements,
+    updateTechRequirements,
+    updateBidFramework,
+    updateFrameworkOutline,
     updateOutline,
     nextStep,
     prevStep,
@@ -42,8 +46,12 @@ function App() {
             fileContent={state.fileContent}
             projectOverview={state.projectOverview}
             techRequirements={state.techRequirements}
+            commercialRequirements={state.commercialRequirements}
+            bidFramework={state.bidFramework}
             onFileUpload={updateFileContent}
             onAnalysisComplete={updateAnalysisResults}
+            onCommercialComplete={updateCommercialRequirements}
+            onFrameworkComplete={updateBidFramework}
           />
         );
       case 1:
@@ -51,14 +59,27 @@ function App() {
           <OutlineEdit
             projectOverview={state.projectOverview}
             techRequirements={state.techRequirements}
+            commercialRequirements={state.commercialRequirements}
+            bidFramework={state.bidFramework}
             outlineData={state.outlineData}
+            frameworkOutlineData={state.frameworkOutlineData}
             onOutlineGenerated={updateOutline}
+            onFrameworkOutlineGenerated={updateFrameworkOutline}
+            onUpdateTechRequirements={updateTechRequirements}
+            onUpdateCommercialRequirements={updateCommercialRequirements}
+            onUpdateBidFramework={updateBidFramework}
           />
         );
       case 2:
         return (
           <ContentEdit
+            projectOverview={state.projectOverview}
+            techRequirements={state.techRequirements}
+            bidFramework={state.bidFramework}
             outlineData={state.outlineData}
+            frameworkOutlineData={state.frameworkOutlineData}
+            onOutlineGenerated={updateOutline}
+            onFrameworkOutlineGenerated={updateFrameworkOutline}
           />
         );
       default:

@@ -4,7 +4,7 @@
 import axios from 'axios';
 import { ConfigData, OutlineData, OutlineItem, OutlineMode } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -25,12 +25,14 @@ export interface FileUploadResponse {
 
 export interface AnalysisRequest {
   file_content: string;
-  analysis_type: 'overview' | 'requirements';
+  analysis_type: 'overview' | 'requirements' | 'commercial' | 'framework';
 }
 
 export interface OutlineRequest {
   overview: string;
   requirements: string;
+  framework_structure?: string;
+  commercial?: string;
   mode?: OutlineMode;
   uploaded_expand?: boolean;
   old_outline?: string;
@@ -42,6 +44,55 @@ export interface ChapterContentRequest {
   parent_chapters?: OutlineItem[];
   sibling_chapters?: OutlineItem[];
   project_overview: string;
+  scoring_context?: string;
+  framework_context?: string;
+}
+
+export interface GapAnalysisRequest {
+  document_content: string;
+  scoring_criteria: string;
+}
+
+export interface GapItem {
+  criteria_name: string;
+  issue_type: string;
+  description: string;
+  suggestion: string;
+}
+
+export interface GapAnalysisResponse {
+  gaps: GapItem[];
+  quality_issues: string[];
+  summary: string;
+}
+
+export interface ScoringTableRequest {
+  document_content: string;
+  scoring_criteria: string;
+}
+
+export interface ScoreItem {
+  criteria_name: string;
+  max_score: number;
+  scored: number;
+  reasoning: string;
+  gaps: string[];
+}
+
+export interface ScoringTableResponse {
+  scores: ScoreItem[];
+  total: number;
+  max_total: number;
+  summary: string;
+}
+
+export interface OptimizeChapterRequest {
+  chapter_id: string;
+  chapter_title: string;
+  current_content: string;
+  scoring_criteria?: string;
+  gap_suggestions?: string;
+  reference_docs?: string;
 }
 
 export interface WordExportRequest {
@@ -130,7 +181,7 @@ const ensureResponseOk = async (response: Response, fallback: string): Promise<R
 export const readSseStream = async (
   response: Response,
   onEvent: (event: StreamEvent) => void,
-  fallbackMessage: string
+  fallbackMessage: string,
 ): Promise<void> => {
   await ensureResponseOk(response, fallbackMessage);
 
@@ -142,40 +193,55 @@ export const readSseStream = async (
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      // 跳过 SSE 注释行 (keepalive)
+      const text = decoder.decode(value, { stream: true });
+      buffer += text;
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+
+      for (const eventBlock of events) {
+        // 跳过纯注释块 (keepalive)
+        if (eventBlock.trim().split('\n').every(l => l.startsWith(':') || l.trim() === '')) {
+          continue;
+        }
+        const dataLine = eventBlock
+          .split('\n')
+          .find((line) => line.startsWith('data: '));
+
+        if (!dataLine) {
+          continue;
+        }
+
+        const data = dataLine.slice(6);
+        if (data === '[DONE]') {
+          return;
+        }
+
+        let event: StreamEvent | null = null;
+        try {
+          event = JSON.parse(data) as StreamEvent;
+        } catch {
+          continue;
+        }
+
+        onEvent(event);
+      }
     }
-
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split('\n\n');
-    buffer = events.pop() || '';
-
-    for (const eventBlock of events) {
-      const dataLine = eventBlock
-        .split('\n')
-        .find((line) => line.startsWith('data: '));
-
-      if (!dataLine) {
-        continue;
-      }
-
-      const data = dataLine.slice(6);
-      if (data === '[DONE]') {
-        return;
-      }
-
-      let event: StreamEvent | null = null;
-      try {
-        event = JSON.parse(data) as StreamEvent;
-      } catch {
-        // 忽略非法片段，等待后续完整数据
-        continue;
-      }
-
-      onEvent(event);
+  } catch (err: any) {
+    // 流被中断（如前端 AbortController 超时、浏览器关闭连接）
+    if (err?.name === 'AbortError' || String(err).includes('abort')) {
+      throw new Error(fallbackMessage + '（连接已中断）');
     }
+    throw err;
+  } finally {
+    try { reader.releaseLock(); } catch {}
   }
 };
 
@@ -206,14 +272,20 @@ export const collectSseText = async (
   return fullText;
 };
 
-const postJson = (path: string, data: unknown) =>
-  fetch(`${API_BASE_URL}${path}`, {
+const postJson = (path: string, data: unknown, timeoutMs?: number) => {
+  const controller = new AbortController();
+  if (timeoutMs) {
+    setTimeout(() => controller.abort(), timeoutMs);
+  }
+  return fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(data),
+    signal: timeoutMs ? controller.signal : undefined,
   });
+};
 
 export const configApi = {
   saveConfig: (config: ConfigData) => api.post('/api/config/save', config),
@@ -256,6 +328,45 @@ export const expandApi = {
       timeout: 300000,
     });
   },
+};
+
+export const reviewApi = {
+  gapAnalysis: (data: GapAnalysisRequest) =>
+    api.post<GapAnalysisResponse>('/api/review/gap-analysis', data, { timeout: 180000 }),
+  scoringTable: (data: ScoringTableRequest) =>
+    api.post<ScoringTableResponse>('/api/review/scoring-table', data, { timeout: 180000 }),
+  optimizeChapterStream: (data: OptimizeChapterRequest) =>
+    postJson('/api/review/optimize-chapter-stream', data, 300000), // 5分钟超时
+};
+
+export interface MergeRequest {
+  framework_outline: any[];
+  scoring_criteria: string;
+  scoring_content_map: Record<string, string>;
+  framework_content_map: Record<string, string>;
+  gap_analysis_json: string;
+}
+
+export interface MergePrepareResponse {
+  outline: any[];
+  matches: any[];
+}
+
+export interface MergeSynthesizeRequest {
+  node_id: string;
+  node_title: string;
+  node_description: string;
+  covers_criteria: string;
+  scoring_content: string;
+  framework_content: string;
+  gap_suggestions: string;
+}
+
+export const mergeApi = {
+  prepare: (data: MergeRequest) =>
+    api.post<MergePrepareResponse>('/api/merge/prepare', data, { timeout: 600000 }),
+  synthesize: (data: MergeSynthesizeRequest) =>
+    api.post<{ content: string }>('/api/merge/synthesize', data, { timeout: 180000 }),
 };
 
 export default api;

@@ -1,4 +1,4 @@
-# 易标极速版 - AI智能标书写作助手
+# 荟写作 - AI智能标书写作助手
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.8+-blue.svg" alt="Python">
@@ -81,7 +81,7 @@
 ### 🏗️ 项目结构
 
 ```
-易标极速版/
+荟写作/
 ├── 📁 backend/                 # 后端服务
 │   ├── 📁 app/
 │   │   ├── main.py            # FastAPI应用入口
@@ -176,5 +176,5 @@ build.bat
 
 
 <p align="center">
-  Made with ❤️ by 易标团队 
+  Made with ❤️ by 荟写作团队 
 </p>

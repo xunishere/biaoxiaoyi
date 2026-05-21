@@ -20,6 +20,7 @@ class ContentService:
         project_overview: str = "",
         scoring_context: str = "",
         framework_context: str = "",
+        target_words: int | None = None,
     ) -> AsyncGenerator[str, None]:
         """流式生成单章节内容。"""
         scoring_context = scoring_context or ""
@@ -31,6 +32,7 @@ class ContentService:
             project_overview=project_overview,
             scoring_context=scoring_context,
             framework_context=framework_context,
+            target_words=target_words,
         )
         async for chunk in self.ai.stream_chat_completion(messages, temperature=0.7):
             yield chunk

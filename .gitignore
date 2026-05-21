@@ -11,6 +11,12 @@ uploads/
 *.pdf
 cloudflared
 
+# 本地运行状态与原始测试数据
+data/
+model/AI测试数据-*/
+model/*.rar
+model/output/
+
 # 构建和打包相关
 dist/
 build/
@@ -35,9 +41,7 @@ yarn-error.log*
 package-lock.json.backup
 
 # IDE和编辑器文件（根据需要调整）
-.vscode/settings.json
-.vscode/extensions.json
-# 保留launch.json和tasks.json用于项目配置
+.vscode/
 
 # 原有的gitignore内容保持不变
 # Byte-compiled / optimized / DLL files

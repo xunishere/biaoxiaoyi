@@ -1,7 +1,7 @@
 /**
  * 主应用组件
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppState } from './hooks/useAppState';
 import ConfigPanel from './components/ConfigPanel';
 import StepBar from './components/StepBar';
@@ -9,8 +9,26 @@ import DocumentAnalysis from './pages/DocumentAnalysis';
 import OutlineEdit from './pages/OutlineEdit';
 import ContentEdit from './pages/ContentEdit';
 import { draftStorage } from './utils/draftStorage';
+import { restoreAllState, syncAllState } from './utils/syncState';
 
 function App() {
+  const [stateReady, setStateReady] = useState(false);
+
+  // 启动时自动双向同步：后端有数据→恢复到本地；本地有数据→上传到后端
+  useEffect(() => {
+    if (sessionStorage.getItem('yibiao_restored')) { setStateReady(true); return; }
+    restoreAllState().then(restored => {
+      if (restored) {
+        sessionStorage.setItem('yibiao_restored', '1');
+        window.location.reload();
+      } else {
+        // 后端无数据，把本地的上传到后端供其他电脑使用
+        syncAllState();
+        setStateReady(true);
+      }
+    });
+  }, []);
+
   const {
     state,
     updateConfig,
@@ -25,7 +43,10 @@ function App() {
     nextStep,
     prevStep,
     resetState,
+    resetProjectData,
   } = useAppState();
+
+  if (!stateReady) return null;
 
   const steps = ['标书解析', '目录编辑', '正文编辑'];
 
@@ -52,6 +73,7 @@ function App() {
             onAnalysisComplete={updateAnalysisResults}
             onCommercialComplete={updateCommercialRequirements}
             onFrameworkComplete={updateBidFramework}
+            onResetProject={resetProjectData}
           />
         );
       case 1:

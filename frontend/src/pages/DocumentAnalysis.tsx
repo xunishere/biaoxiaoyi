@@ -6,6 +6,8 @@ import ReactMarkdown from 'react-markdown';
 import { collectSseText, documentApi, getErrorMessage } from '../services/api';
 import { CloudArrowUpIcon, DocumentIcon } from '@heroicons/react/24/outline';
 import { draftStorage } from '../utils/draftStorage';
+import { idbStorage } from '../utils/idbStorage';
+import { syncAllState } from '../utils/syncState';
 
 const STREAM_UPDATE_DELAY = 80;
 
@@ -19,6 +21,7 @@ interface DocumentAnalysisProps {
   onAnalysisComplete: (overview: string, requirements: string) => void;
   onCommercialComplete: (commercial: string) => void;
   onFrameworkComplete: (framework: string) => void;
+  onResetProject: () => void;
 }
 
 const DocumentAnalysis: React.FC<DocumentAnalysisProps> = ({
@@ -31,6 +34,7 @@ const DocumentAnalysis: React.FC<DocumentAnalysisProps> = ({
   onAnalysisComplete,
   onCommercialComplete,
   onFrameworkComplete,
+  onResetProject,
 }) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -186,9 +190,19 @@ const DocumentAnalysis: React.FC<DocumentAnalysisProps> = ({
       if (response.data.success && response.data.file_content) {
         // 上传新招标文件：清空上一轮 localStorage（按你的需求）
         // 注意：这会同时清掉之前保存的草稿/正文内容缓存等
+        // 新文件：清掉上一轮全部数据
         draftStorage.clearAll();
+        idbStorage.clearAll().catch(() => {});
+        localStorage.removeItem('yibiao_merged_outline');
+        localStorage.removeItem('yibiao_merged_content');
+        localStorage.removeItem('yibiao_review_gap_scoring');
+        localStorage.removeItem('yibiao_review_gap_framework');
+        localStorage.removeItem('yibiao_review_score_scoring');
+        localStorage.removeItem('yibiao_review_score_framework');
+        onResetProject();
         onFileUpload(response.data.file_content);
         setMessage({ type: 'success', text: response.data.message });
+        syncAllState();
       } else {
         setMessage({ type: 'error', text: response.data.message });
       }
@@ -303,6 +317,7 @@ const DocumentAnalysis: React.FC<DocumentAnalysisProps> = ({
       onFrameworkComplete(finalFramework);
       const elapsed = stopTimer();
       setMessage({ type: 'success', text: `标书解析完成（4轮分析），耗时 ${formatDuration(elapsed)}` });
+      syncAllState();
 
       // 清空流式内容
       resetStreamingPreview();

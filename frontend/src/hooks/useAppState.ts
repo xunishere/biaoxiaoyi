@@ -127,8 +127,17 @@ export const useAppState = () => {
     setState(initialState);
   }, []);
 
+  const resetProjectData = useCallback(() => {
+    setState(prev => ({
+      ...initialState,
+      config: prev.config,  // 保留配置
+      currentStep: prev.currentStep,
+    }));
+  }, []);
+
   return {
     state,
+    resetProjectData,
     updateConfig,
     updateStep,
     updateFileContent,

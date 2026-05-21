@@ -12,7 +12,7 @@ from .utils.logging_setup import setup_logging
 
 setup_logging(settings.enable_file_logging)
 
-from .routers import config, document, outline, content, expand, review, merge
+from .routers import config, document, outline, content, expand, review, merge, state
 
 # 创建FastAPI应用实例
 app = FastAPI(
@@ -38,7 +38,11 @@ app.include_router(content.router)
 app.include_router(expand.router)
 app.include_router(review.router)
 app.include_router(merge.router)
+app.include_router(state.router)
 
+
+from datetime import datetime
+_START_TIME = datetime.now().strftime("%H:%M:%S")
 
 # 健康检查端点
 @app.get("/health")
@@ -46,6 +50,7 @@ async def health_check():
     """健康检查"""
     return {
         "status": "healthy",
+        "start_time": _START_TIME,
         "app_name": settings.app_name,
         "version": settings.app_version,
     }

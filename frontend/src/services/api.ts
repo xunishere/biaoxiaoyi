@@ -46,6 +46,7 @@ export interface ChapterContentRequest {
   project_overview: string;
   scoring_context?: string;
   framework_context?: string;
+  target_words?: number;
 }
 
 export interface GapAnalysisRequest {
@@ -69,6 +70,7 @@ export interface GapAnalysisResponse {
 export interface ScoringTableRequest {
   document_content: string;
   scoring_criteria: string;
+  gap_analysis_json?: string;
 }
 
 export interface ScoreItem {
@@ -92,6 +94,7 @@ export interface OptimizeChapterRequest {
   current_content: string;
   scoring_criteria?: string;
   gap_suggestions?: string;
+  sibling_summaries?: string;
   reference_docs?: string;
 }
 
@@ -304,7 +307,16 @@ export const documentApi = {
     });
   },
   analyzeDocumentStream: (data: AnalysisRequest) => postJson('/api/document/analyze-stream', data),
-  exportWord: async (data: WordExportRequest) => ensureResponseOk(await postJson('/api/document/export-word', data), '导出失败'),
+  exportWord: async (data: WordExportRequest): Promise<Blob> => {
+    const resp = await fetch(`${API_BASE_URL}/api/document/export-word`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    await ensureResponseOk(resp, '导出失败');
+    const buf = await resp.arrayBuffer();
+    return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  },
 };
 
 export const outlineApi = {
@@ -314,7 +326,7 @@ export const outlineApi = {
 
 export const contentApi = {
   generateChapterContent: (data: ChapterContentRequest) => api.post<{ success: boolean; content: string }>('/api/content/generate-chapter', data),
-  generateChapterContentStream: (data: ChapterContentRequest) => postJson('/api/content/generate-chapter-stream', data),
+  generateChapterContentStream: (data: ChapterContentRequest) => postJson('/api/content/generate-chapter-stream', data, 300000),
 };
 
 export const expandApi = {
@@ -332,15 +344,16 @@ export const expandApi = {
 
 export const reviewApi = {
   gapAnalysis: (data: GapAnalysisRequest) =>
-    api.post<GapAnalysisResponse>('/api/review/gap-analysis', data, { timeout: 180000 }),
+    api.post<GapAnalysisResponse>('/api/review/gap-analysis', data, { timeout: 600000 }),
   scoringTable: (data: ScoringTableRequest) =>
-    api.post<ScoringTableResponse>('/api/review/scoring-table', data, { timeout: 180000 }),
+    api.post<ScoringTableResponse>('/api/review/scoring-table', data, { timeout: 600000 }),
   optimizeChapterStream: (data: OptimizeChapterRequest) =>
     postJson('/api/review/optimize-chapter-stream', data, 300000), // 5分钟超时
 };
 
 export interface MergeRequest {
   framework_outline: any[];
+  scoring_outline?: any[];
   scoring_criteria: string;
   scoring_content_map: Record<string, string>;
   framework_content_map: Record<string, string>;
@@ -360,13 +373,23 @@ export interface MergeSynthesizeRequest {
   scoring_content: string;
   framework_content: string;
   gap_suggestions: string;
+  target_words?: number;
 }
 
 export const mergeApi = {
   prepare: (data: MergeRequest) =>
     api.post<MergePrepareResponse>('/api/merge/prepare', data, { timeout: 600000 }),
   synthesize: (data: MergeSynthesizeRequest) =>
-    api.post<{ content: string }>('/api/merge/synthesize', data, { timeout: 180000 }),
+    api.post<{ content: string }>('/api/merge/synthesize', data, { timeout: 300000 }),
+  saveResult: (data: { outline: any[]; content: Record<string, string> }) =>
+    api.post('/api/merge/save', data),
+  loadResult: () =>
+    api.get<{ outline: any[]; content: Record<string, string> }>('/api/merge/load'),
+};
+
+export const stateApi = {
+  save: (data: Record<string, any>) => api.post('/api/state/save', data),
+  load: () => api.get<Record<string, any>>('/api/state/load'),
 };
 
 export default api;

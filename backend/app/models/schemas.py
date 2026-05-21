@@ -159,6 +159,7 @@ class ChapterContentRequest(BaseModel):
     framework_context: Optional[str] = Field(
         None, description="框架结构上下文"
     )
+    target_words: Optional[int] = Field(None, description="目标字数")
 
 
 class ErrorResponse(BaseModel):
@@ -220,6 +221,7 @@ class ScoringTableRequest(BaseModel):
 
     document_content: str = Field(..., description="完整投标文件正文")
     scoring_criteria: str = Field(..., description="评分标准原文")
+    gap_analysis_json: str = Field("", description="缺口分析结果JSON，用于交叉验证评分")
 
 
 class ScoreItem(BaseModel):
@@ -249,6 +251,7 @@ class OptimizeChapterRequest(BaseModel):
     current_content: str = Field(..., description="当前内容")
     scoring_criteria: str = Field("", description="评分标准")
     gap_suggestions: str = Field("", description="缺口分析建议")
+    sibling_summaries: Optional[str] = Field(None, description="同级章节摘要，避免重复")
     reference_docs: Optional[str] = Field(None, description="参考技术方案文档内容")
 
 
@@ -265,7 +268,8 @@ class MergeRequest(BaseModel):
 class MergePrepareRequest(BaseModel):
     """合并准备请求（Phase 1+2）"""
 
-    framework_outline: List[Dict[str, Any]] = Field(..., description="框架版目录（三级）")
+    framework_outline: List[Dict[str, Any]] = Field(..., description="框架版目录")
+    scoring_outline: List[Dict[str, Any]] = Field(default_factory=list, description="评分版目录")
     scoring_criteria: str = Field(..., description="评分标准")
     scoring_content_map: Dict[str, str] = Field(default_factory=dict, description="评分版章节ID→内容")
     framework_content_map: Dict[str, str] = Field(default_factory=dict, description="框架版章节ID→内容")
@@ -282,3 +286,4 @@ class MergeSynthesizeRequest(BaseModel):
     scoring_content: str = Field("", description="评分版对应内容")
     framework_content: str = Field("", description="框架版对应内容")
     gap_suggestions: str = Field("", description="缺口分析建议")
+    target_words: Optional[int] = Field(None, description="目标字数")

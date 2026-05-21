@@ -12,7 +12,7 @@ def _build_outline_system_prompt() -> str:
 1. 目录结构要全面覆盖技术标的所有必要章节
 2. 章节名称要专业、准确，符合投标文件规范
 3. 一级目录名称要与技术评分要求中的章节名称一致；如果技术评分要求中没有明确章节名称，则结合内容总结一级目录名称
-4. 一共包括三级目录
+4. 一共包括四级目录
 5. 返回标准 JSON 格式，包含章节编号、标题、描述和子章节
 6. 除了 JSON 结果外，不要输出任何其他内容
 
@@ -32,7 +32,14 @@ JSON 格式要求：
             {
               "id": "1.1.1",
               "title": "",
-              "description": ""
+              "description": "",
+              "children": [
+                {
+                  "id": "1.1.1.1",
+                  "title": "",
+                  "description": ""
+                }
+              ]
             }
           ]
         }
@@ -229,7 +236,7 @@ def generate_aligned_children_outline_prompt(
     requirement_group: Dict[str, Any],
     suggestions: list[str] | None = None,
 ) -> List[Dict[str, str]]:
-    """围绕指定技术评分大类生成二三级目录。"""
+    """围绕指定技术评分大类生成二三四级目录。"""
     parent_id = parent_item.get("id", "1")
     parent_title = parent_item.get("title", "未命名一级目录")
     parent_description = parent_item.get("description", "")
@@ -239,16 +246,21 @@ def generate_aligned_children_outline_prompt(
         f"- {item}" for item in detail_points if isinstance(item, str) and item.strip()
     )
 
-    system_prompt = """你是一个专业的标书编写专家。请围绕指定的技术评分大类，为已经固定好的一级目录生成二级和三级目录。
+    system_prompt = """你是一个专业的标书编写专家。请围绕指定的技术评分大类，为已经固定好的一级目录生成二级、三级和四级目录。
+
+关键规则：下面"细项"中列出的每一个条目都必须直接作为二级目录（children 的直接子节点），不要把它们打包到一个汇总节点下面。例如有14个细项，就应该有14个二级目录，每个二级目录再展开三四级。
+
+强制结构——项目概述：当一级目录是技术相关时（标题含"技术"），第一个二级目录必须是「项目概述」，其下固定6个三级：现状分析、项目背景、建设原则、建设内容、重难点分析、合理化建议。每个三级可有四级展开。内容必须基于项目概述信息编写。然后后面的二级目录再对应各项细项。
 
 要求：
-1. 一级目录标题和顺序已经固定，不能修改、重命名、合并或删除一级目录
-2. 只输出当前一级目录下的二级和三级目录，不要重复输出一级目录本身
-3. 二级和三级目录要覆盖当前技术评分大类及其细项，不能越界写入其他评分大类内容
+1. 一级目录标题已经固定，不能修改、重命名、合并或删除一级目录
+2. 技术类一级目录的第一个二级必须是「项目概述」
+3. 其余二级目录直接对应每一项细项，三级做进一步细分，四级做最细粒度要点展开
 4. 返回标准 JSON，格式为 {"children": [...]}，children 中只能包含当前一级目录的直接子目录
-5. 每个节点必须包含 id、title、description，三级目录继续使用 children 字段
-6. 章节编号必须以给定的一级目录编号为前缀，例如父级是 2，则二级目录编号从 2.1 开始，三级目录编号从 2.1.1 开始
-7. 除了 JSON 结果外，不要输出任何其他内容
+5. 每个节点必须包含 id、title、description，非叶子节点使用 children 字段
+6. 章节编号必须以给定的一级目录编号为前缀
+7. 四级目录是最小粒度，不再有 children
+8. 除了 JSON 结果外，不要输出任何其他内容
 """
 
     detail_content = detail_lines or "- 未提供明确细项，请根据评分大类描述合理展开"
@@ -267,7 +279,7 @@ def generate_aligned_children_outline_prompt(
         },
         {
             "role": "user",
-            "content": '请仅生成该一级目录下的二级、三级目录，一级目录标题必须保持为当前给定标题，返回格式必须是 {"children": [...]}。'
+            "content": '请仅生成该一级目录下的子目录。如果该节点已有children（如"项目概述"及其子项），请原样保留，在此之后追加新的二级目录。不要重复已有标题。返回 {"children": [...保留已有+新增...]}}。'
             + _format_revision_suggestions(suggestions),
         },
     ]
@@ -281,7 +293,7 @@ def generate_aligned_children_outline_with_old_prompt(
     old_outline: str | None,
     suggestions: list[str] | None = None,
 ) -> List[Dict[str, str]]:
-    """结合旧目录参考，为指定评分大类生成二三级目录。"""
+    """结合旧目录参考，为指定评分大类生成二三四级目录。"""
     messages = generate_aligned_children_outline_prompt(
         overview=overview,
         requirements=requirements,
@@ -294,7 +306,7 @@ def generate_aligned_children_outline_with_old_prompt(
     )
     messages[-1] = {
         "role": "user",
-        "content": '请在覆盖当前技术评分大类细项的前提下，参考用户目录优化当前一级目录下的二级、三级目录，但不得修改当前一级目录标题，返回格式必须是 {"children": [...]}。'
+        "content": '请在覆盖当前技术评分大类细项的前提下，参考用户目录优化当前一级目录下的二级、三级、四级目录，但不得修改当前一级目录标题，返回格式必须是 {"children": [...]}。'
         + _format_revision_suggestions(suggestions),
     }
     return messages
@@ -306,19 +318,19 @@ def generate_children_outline_prompt(
     parent_item: Dict[str, Any],
     suggestions: list[str] | None = None,
 ) -> List[Dict[str, str]]:
-    """为指定一级目录生成二三级目录。"""
+    """为指定一级目录生成二三四级目录。"""
     parent_id = parent_item.get("id", "1")
     parent_title = parent_item.get("title", "未命名一级目录")
     parent_description = parent_item.get("description", "")
 
-    system_prompt = """你是一个专业的标书编写专家。请围绕指定的一级目录，生成其下属的二级目录和三级目录。
+    system_prompt = """你是一个专业的标书编写专家。请围绕指定的一级目录，生成其下属的二级、三级和四级目录。
 
 要求：
-1. 只输出当前一级目录下的二级和三级目录，不要重复输出一级目录本身
-2. 返回标准 JSON，格式为 {"children": [...]} 
+1. 只输出当前一级目录下的子目录，不要重复输出一级目录本身
+2. 返回标准 JSON，格式为 {"children": [...]}
 3. children 中只能包含当前一级目录的直接子目录，每个节点必须包含 id、title、description
-4. 二级目录下如有三级目录，同样使用 children 字段
-5. 章节编号必须以给定的一级目录编号为前缀，例如父级是 2，则二级目录编号从 2.1 开始，三级目录编号从 2.1.1 开始
+4. 四级目录是最小粒度，不再有 children
+5. 章节编号必须以给定的一级目录编号为前缀，例如父级是 2，则二级编号从 2.1 开始，三级从 2.1.1，四级从 2.1.1.1
 6. 除了 JSON 结果外，不要输出任何其他内容
 """
 
@@ -332,7 +344,7 @@ def generate_children_outline_prompt(
         },
         {
             "role": "user",
-            "content": '请仅生成该一级目录下的二级、三级目录，返回格式必须是 {"children": [...]}。'
+            "content": '请仅生成该一级目录下的子目录。如果已存在children，请原样保留并追加新目录。返回 {"children": [...]}}。'
             + _format_revision_suggestions(suggestions),
         },
     ]
@@ -345,7 +357,7 @@ def generate_children_outline_with_old_prompt(
     old_outline: str | None,
     suggestions: list[str] | None = None,
 ) -> List[Dict[str, str]]:
-    """为指定一级目录生成二三级目录，并结合旧目录参考。"""
+    """为指定一级目录生成二三四级目录，并结合旧目录参考。"""
     messages = generate_children_outline_prompt(
         overview=overview,
         requirements=requirements,
@@ -357,7 +369,7 @@ def generate_children_outline_with_old_prompt(
     )
     messages[-1] = {
         "role": "user",
-        "content": '请在满足技术评分要求的前提下，充分结合用户自己编写的目录，仅生成该一级目录下的二级、三级目录，返回格式必须是 {"children": [...]}。'
+        "content": '请在满足技术评分要求的前提下，充分结合用户自己编写的目录，仅生成该一级目录下的二级、三级、四级目录，返回格式必须是 {"children": [...]}。'
         + _format_revision_suggestions(suggestions),
     }
     return messages
@@ -374,7 +386,7 @@ def review_outline_messages(
 要求：
 1. 重点检查目录是否完整覆盖技术评分要点
 2. 检查一级目录名称是否专业、准确，是否尽量与评分项原文保持一致
-3. 检查目录层级是否清晰，是否达到三级目录要求，是否存在明显遗漏、错位、重复或不合理章节
+3. 检查目录层级是否清晰，是否达到四级目录要求，是否存在明显遗漏、错位、重复或不合理章节
 4. 只返回 JSON，格式为：{"passed": true, "suggestions": []}
 5. 若不通过，suggestions 中必须给出具体、可执行的修改建议
 6. 除了 JSON 外，不要输出任何其他内容
@@ -404,8 +416,8 @@ def review_aligned_outline_messages(
 要求：
 1. 一级目录必须与提供的技术评分大类一一对应，数量一致、顺序一致、标题必须完全一致
 2. 不允许缺失技术评分大类，也不允许新增、合并、改写一级目录
-3. 二级和三级目录要围绕各自对应的技术评分大类与细项展开，避免错位、遗漏和明显重复
-4. 检查完整目录是否层级清晰，整体是否达到三级目录要求
+3. 二级、三级和四级目录要围绕各自对应的技术评分大类与细项展开，避免错位、遗漏和明显重复
+4. 检查完整目录是否层级清晰，整体是否达到四级目录要求
 5. 只返回 JSON，格式为：{"passed": true, "suggestions": []}
 6. 若不通过，suggestions 中必须给出具体、可执行的修改建议，重点说明哪个评分大类覆盖不足或结构不合理
 7. 除了 JSON 外，不要输出任何其他内容
@@ -436,23 +448,24 @@ def extract_framework_groups_messages(
     """从投标文件框架结构中提取一级目录分组。"""
     system_prompt = """你是一个专业的招标文件分析专家。请从招标文件规定的「投标文件框架结构」中提取适合作为一级目录的章节分组。
 
+关键原则：一级分组是"章节大类"，不是单个文件/条目。例如框架中有"资信部分"、"技术部分"、"商务部分"这样的分类标题时，这些才是 groups。下面列出的具体文件/条目（如投标书、开标一览表、需求理解等）是每个 group 下的 detail_points。
+
 要求：
-1. 严格基于提供的框架结构文本，逐条提取所有一级分组和二级条目
-2. 一级分组的标题保持原文名称不变（如"资信部分"、"技术部分"等）
-3. 二级条目按原文编号和名称完整保留
-4. requirement_id 必须唯一，使用 F1、F2、F3 格式
-5. description 简要概括该分组的内容范围
-6. detail_points 列出该分组下的所有二级条目原文
-7. 只返回 JSON，格式必须为 {"groups": [...]}，不要输出任何其他内容
+1. 只提取最高层级的章节大类（如"资信部分"、"技术部分"等）作为 groups，通常只有 2-5 个
+2. 如果框架没有明确的大类标题，则根据条目的内容属性归类为 2-3 个 groups（如"商务文件"、"技术文件"）
+3. 不要把每个单独条目（投标书、报价表等）作为一个 group
+4. 每个 group 的 detail_points 列出该大类下的所有二级条目
+5. requirement_id 必须唯一，使用 F1、F2、F3 格式
+6. 只返回 JSON，格式必须为 {"groups": [...]}，不要输出任何其他内容
 
 JSON 格式要求：
 {
   "groups": [
     {
       "requirement_id": "F1",
-      "title": "严格按原文的一级标题",
-      "description": "该分组内容范围概述",
-      "detail_points": ["二级条目1", "二级条目2"]
+      "title": "资信部分",
+      "description": "该大类内容概述",
+      "detail_points": ["投标书", "开标一览表", "分项报价表", "资格证明文件"]
     }
   ]
 }
@@ -473,49 +486,57 @@ def generate_framework_children_outline_prompt(
     overview: str,
     parent_item: Dict[str, Any],
     framework_group: Dict[str, Any],
+    requirements: str = "",
     suggestions: list[str] | None = None,
 ) -> List[Dict[str, str]]:
     """围绕指定框架分组，生成二三四级目录。"""
+    import re
     parent_id = parent_item.get("id", "1")
     parent_title = parent_item.get("title", "未命名一级目录")
     requirement_id = framework_group.get("requirement_id", "F1")
-    detail_points = framework_group.get("detail_points") or []
-    detail_lines = "\n".join(
-        f"- {item}" for item in detail_points if isinstance(item, str) and item.strip()
-    )
+    # 清洗 detail_points：去编号前缀
+    raw_points = framework_group.get("detail_points") or []
+    clean_points: list[str] = []
+    for item in raw_points:
+        if not isinstance(item, str) or not item.strip():
+            continue
+        cleaned = re.sub(r'^[\d]+[\.\)、\s]+', '', item.strip())
+        clean_points.append(cleaned)
+    if not clean_points:
+        clean_points = [re.sub(r'^[\d]+[\.\)、\s]+', '', item.strip()) for item in raw_points if isinstance(item, str) and item.strip()]
+    detail_lines = "\n".join(f"- {item}" for item in clean_points)
 
     system_prompt = """你是一个专业的标书编写专家。请围绕指定的招标文件框架分组，为已经固定好的一级目录生成二级、三级和四级目录。
 
+重要约束：当前一级目录标题已固定，所有子目录（二级、三级、四级）的标题绝不能与一级标题完全相同。
+
+强制结构——项目概述：当一级目录是技术相关时（标题含"技术"），第一个二级目录必须是「项目概述」，其下固定6个三级：现状分析、项目背景、建设原则、建设内容、重难点分析、合理化建议。每个三级至少生成2个四级叶子节点。之后的其他条目继续展开。
+
+深度要求（关键）：每个二级条目必须展开到四级。三级目录至少2个，每个三级下至少2个四级叶子节点。不得出现只有标题没有children的二级/三级节点（除四级叶子外）。框架规定的条目少时，根据技术常识合理补充展开。
+
 要求：
 1. 一级目录标题已经固定，不能修改、重命名、合并或删除
-2. 只输出当前一级目录下的子目录，不要重复输出一级目录本身
-3. 二级目录必须严格对应框架分组下的各个条目，条目名称保留原文风格但如果原文只有编号（如"1."），需补全有意义的标题
-4. 三级目录对二级条目做进一步细分，四级目录做最细粒度的要点展开
-5. 每个节点必须包含 id、title、description，非叶子节点使用 children 字段
-6. 章节编号以给定的一级编号为前缀（如父级是 2，则子级从 2.1, 2.1.1, 2.1.1.1 依次展开）
-7. 四级目录是最小粒度，不再有 children
-8. 除了 JSON 结果外，不要输出任何其他内容
+2. 技术类一级目录的第一个二级必须是「项目概述」
+3. 其余二级目录严格对应框架分组下的各个条目
+4. 每个二级必须有至少2个三级，每个三级必须有至少2个四级叶子
+5. 每个节点必须包含 id、title、description
+6. 章节编号以给定的一级编号为前缀
+7. 除JSON外不输出任何其他内容
 
-JSON 格式示例：
+JSON 示例：
 {
   "children": [
     {
       "id": "2.1",
-      "title": "二级标题",
-      "description": "本节内容描述",
+      "title": "项目概述",
+      "description": "...",
       "children": [
-        {
-          "id": "2.1.1",
-          "title": "三级标题",
-          "description": "本节内容描述",
-          "children": [
-            {
-              "id": "2.1.1.1",
-              "title": "四级标题",
-              "description": "具体要点描述"
-            }
-          ]
-        }
+        {"id": "2.1.1", "title": "现状分析", "description": "...",
+         "children": [{"id": "2.1.1.1", "title": "...", "description": "..."},
+                      {"id": "2.1.1.2", "title": "...", "description": "..."}]},
+        {"id": "2.1.2", "title": "项目背景", "description": "...",
+         "children": [{"id": "2.1.2.1", "title": "...", "description": "..."},
+                      {"id": "2.1.2.2", "title": "...", "description": "..."}]}
       ]
     }
   ]
@@ -524,9 +545,16 @@ JSON 格式示例：
 
     detail_content = detail_lines or "- 根据分组描述合理展开"
 
-    return [
+    messages: list[dict[str, str]] = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": f"项目概述：\n{overview}"},
+    ]
+    if requirements and requirements.strip():
+        messages.append({
+            "role": "user",
+            "content": f"技术评分要求（子目录需要覆盖这些评分要点）：\n{requirements}",
+        })
+    messages.extend([
         {
             "role": "user",
             "content": f"当前固定一级目录：\n编号：{parent_id}\n标题：{parent_title}",
@@ -537,10 +565,11 @@ JSON 格式示例：
         },
         {
             "role": "user",
-            "content": f'请仅生成该一级目录下的二级、三级、四级目录，二级条目必须与框架规定的条目一一对应，返回格式必须是 {{"children": [...]}}。'
+            "content": f'请仅生成该一级目录下的子目录。如果该节点已有children（如"项目概述"及其子项），请原样保留，在此之后追加新的二级目录。不要重复已有标题。返回 {{"children": [...保留已有+新增...]}}。'
             + _format_revision_suggestions(suggestions),
         },
-    ]
+    ])
+    return messages
 
 
 def review_framework_outline_messages(

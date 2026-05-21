@@ -39,12 +39,13 @@ async def gap_analysis(request: GapAnalysisRequest):
 
 @router.post("/scoring-table", response_model=ScoringTableResponse)
 async def scoring_table(request: ScoringTableRequest):
-    """生成评分表。"""
+    """生成评分表（有缺口分析时自动交叉验证）。"""
     try:
         review_service = ReviewService()
         result = await review_service.scoring_table(
             document_content=request.document_content,
             scoring_criteria=request.scoring_criteria,
+            gap_analysis_json=request.gap_analysis_json,
         )
         return ScoringTableResponse(**result)
     except AppError as exc:
@@ -70,6 +71,7 @@ async def optimize_chapter_stream(request: OptimizeChapterRequest):
                 current_content=request.current_content,
                 scoring_criteria=request.scoring_criteria,
                 gap_suggestions=request.gap_suggestions,
+                sibling_summaries=request.sibling_summaries,
                 reference_docs=request.reference_docs,
             ):
                 yield sse_chunk(chunk)

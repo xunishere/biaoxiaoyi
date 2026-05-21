@@ -26,6 +26,7 @@ async def generate_chapter_content(request: ChapterContentRequest):
             project_overview=request.project_overview,
             scoring_context=request.scoring_context,
             framework_context=request.framework_context,
+            target_words=request.target_words,
         )
         return {"success": True, "content": content}
     except AppError as exc:
@@ -52,6 +53,7 @@ async def generate_chapter_content_stream(request: ChapterContentRequest):
                 project_overview=request.project_overview,
                 scoring_context=request.scoring_context,
                 framework_context=request.framework_context,
+                target_words=request.target_words,
             ):
                 yield sse_chunk(chunk)
         except AppError as exc:

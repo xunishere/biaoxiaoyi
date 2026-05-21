@@ -217,6 +217,94 @@ class OpenAIUtil:
                 chat_models.append(model.id)
         return sorted(set(chat_models))
 
+    @staticmethod
+    def _compress_text(text: str, ratio: float) -> str:
+        """智能压缩中文标书文本：保留首句+标题，去掉冗余格式。"""
+        if len(text) <= 500:
+            return text
+
+        target_len = int(len(text) * ratio)
+        paragraphs = text.split("\n")
+        compressed: list[str] = []
+
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+            # 标题行（短、编号开头）保留全文
+            if len(para) < 80 or para[0].isdigit() or para[0] in "#一二三四五六七八九十":
+                compressed.append(para)
+            else:
+                # 正文段：取首句
+                sentences = para.replace("。", "。\n").split("\n")
+                first = sentences[0].strip()
+                if first and first[-1] not in "。！？.!?":
+                    first += "。"
+                compressed.append(first)
+            if len("\n".join(compressed)) >= target_len:
+                break
+
+        result = "\n".join(compressed)
+        if len(result) < len(text):
+            result += f"\n…(已压缩)"
+        return result
+
+    @staticmethod
+    def _compress_messages(
+        messages: list[dict[str, str]], ratio: float
+    ) -> list[dict[str, str]]:
+        """压缩消息：system保留，user智能压缩。"""
+        compressed: list[dict[str, str]] = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role == "system":
+                compressed.append(msg)
+            else:
+                compressed.append({
+                    "role": role,
+                    "content": OpenAIUtil._compress_text(content, ratio),
+                })
+        return compressed
+
+    async def _call_with_retry(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float,
+        stream: bool,
+        response_format: dict | None = None,
+        max_tokens: int | None = None,
+    ) -> Any:
+        """带压缩重试的 API 调用：上下文溢出→压缩→重试。"""
+        retry_ratios = [0.6, 0.3]  # 第1次重试60%，第2次30%
+        last_error = None
+
+        for attempt in range(len(retry_ratios) + 1):
+            if attempt > 0:
+                ratio = retry_ratios[attempt - 1]
+                logger.warning("上下文溢出，压缩至%d%%后重试（第%d次）", int(ratio * 100), attempt)
+                messages = self._compress_messages(messages, ratio)
+
+            try:
+                return await self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    stream=stream,
+                    **({"response_format": response_format} if response_format is not None else {}),
+                    **({"max_tokens": max_tokens} if max_tokens is not None else {}),
+                )
+            except Exception as exc:
+                last_error = exc
+                msg = str(exc).lower()
+                if "context" not in msg and "length" not in msg and "token" not in msg:
+                    raise  # 非上下文错误，直接抛
+                # 上下文错误，继续重试
+                if attempt == len(retry_ratios):
+                    raise
+
+        raise AppError(f"模型调用失败: {last_error}", status_code=502) from last_error
+
     async def stream_chat_completion(
         self,
         messages: list[dict[str, str]],
@@ -231,28 +319,15 @@ class OpenAIUtil:
         self._log_ai_request(request_id, messages, temperature, response_format)
 
         try:
-            stream = await self.client.chat.completions.create(
-                model=self.model_name,
+            stream = await self._call_with_retry(
                 messages=messages,
                 temperature=temperature,
                 stream=True,
-                **(
-                    {"response_format": response_format}
-                    if response_format is not None
-                    else {}
-                ),
-                **({"max_tokens": max_tokens} if max_tokens is not None else {}),
+                response_format=response_format,
+                max_tokens=max_tokens,
             )
         except Exception as exc:
-            self._log_ai_error(
-                request_id,
-                messages,
-                temperature,
-                response_format,
-                "",
-                raw_chunks,
-                exc,
-            )
+            self._log_ai_error(request_id, messages, temperature, response_format, "", raw_chunks, exc)
             raise AppError(f"模型调用失败: {exc}", status_code=502) from exc
 
         try:
@@ -290,6 +365,7 @@ class OpenAIUtil:
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         response_format: dict | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """收集流式输出并拼接为完整文本。"""
         parts: list[str] = []
@@ -297,6 +373,7 @@ class OpenAIUtil:
             messages,
             temperature=temperature,
             response_format=response_format,
+            max_tokens=max_tokens,
         ):
             parts.append(chunk)
         return "".join(parts)
@@ -307,6 +384,7 @@ class OpenAIUtil:
         temperature: float,
         use_response_format: bool,
         progress_callback: ProgressCallback | None = None,
+        max_tokens: int | None = None,
     ) -> tuple[str, bool]:
         """优先使用 JSON 模式请求，不支持时自动降级为普通请求。"""
         try:
@@ -316,6 +394,7 @@ class OpenAIUtil:
                 response_format={"type": "json_object"}
                 if use_response_format
                 else None,
+                max_tokens=max_tokens,
             )
             return content, use_response_format
         except AppError as exc:
@@ -333,6 +412,7 @@ class OpenAIUtil:
                 messages,
                 temperature=temperature,
                 response_format=None,
+                max_tokens=max_tokens,
             )
             return content, False
 
@@ -410,6 +490,7 @@ class OpenAIUtil:
         progress_callback: ProgressCallback | None = None,
         progress_label: str = "JSON结果",
         failure_message: str = "模型返回的 JSON 数据格式无效",
+        max_tokens: int | None = None,
     ) -> Dict[str, Any]:
         """收集并校验 JSON 响应。"""
         max_retries = 2
@@ -426,6 +507,7 @@ class OpenAIUtil:
                     temperature=temperature,
                     use_response_format=use_response_format,
                     progress_callback=progress_callback,
+                    max_tokens=max_tokens,
                 )
                 normalized = self._normalize_json_response(
                     content,

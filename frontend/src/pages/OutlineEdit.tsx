@@ -4,6 +4,7 @@
 import React, { useState, useRef } from 'react';
 import { OutlineData, OutlineItem } from '../types';
 import { getErrorMessage, outlineApi, readSseStream } from '../services/api';
+import { syncAllState } from '../utils/syncState';
 import { ChevronRightIcon, ChevronDownIcon, DocumentTextIcon, PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 interface OutlineEditProps {
@@ -125,6 +126,7 @@ const OutlineEdit: React.FC<OutlineEditProps> = ({
       onOutlineGenerated(outlineResult as OutlineData);
       const elapsed = stopTimer();
       setMessage({ type: 'success', text: `评分标准目录生成完成，耗时 ${formatDuration(elapsed)}` });
+      syncAllState();
 
       const allIds = new Set<string>();
       const collectIds = (items: OutlineItem[]) => {
@@ -183,9 +185,19 @@ const OutlineEdit: React.FC<OutlineEditProps> = ({
 
       if (!outlineResult) throw new Error('未收到框架目录生成结果');
 
+      // 只保留技术部分（去掉商务/报价/资信等非技术章节）
+      const isTechnical = (title: string): boolean => {
+        const t = title.replace(/\s/g, '');
+        if (/商务|报价|资信|资格证明|信誉证明|营业执照|纳税|财务|开标|分项|投标书/.test(t)) return false;
+        return /技术|方案|服务|巡检|维护|备份|优化|故障|保障|安全|响应|对接|升级|应急|平台|摄像/.test(t);
+      };
+      const filteredOutline = (outlineResult as OutlineData).outline.filter(item => isTechnical(item.title));
+      outlineResult = { ...(outlineResult as OutlineData), outline: filteredOutline };
+
       onFrameworkOutlineGenerated(outlineResult as OutlineData);
       const elapsed = stopTimer();
       setMessage({ type: 'success', text: `框架结构目录生成完成，耗时 ${formatDuration(elapsed)}` });
+      syncAllState();
 
       const allIds = new Set<string>();
       const collectIds = (items: OutlineItem[]) => {

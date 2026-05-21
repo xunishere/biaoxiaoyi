@@ -16,6 +16,8 @@ import {
 } from '../services/api';
 import { saveAs } from 'file-saver';
 import { draftStorage } from '../utils/draftStorage';
+import { idbStorage } from '../utils/idbStorage';
+import { syncAllState } from '../utils/syncState';
 
 interface ContentEditProps {
   projectOverview: string;
@@ -56,8 +58,15 @@ const ContentEdit: React.FC<ContentEditProps> = ({
   const [progress, setProgress] = useState<GenProgress>({ total: 0, completed: 0, current: '', failed: [], generating: new Set() });
 
   // 合并版状态
-  const [mergedOutline, setMergedOutline] = useState<OutlineItem[]>([]);
-  const [mergedContent, setMergedContent] = useState<Record<string, string>>({});
+  const [mergedOutline, setMergedOutline] = useState<OutlineItem[]>(() => {
+    try { return JSON.parse(localStorage.getItem('yibiao_merged_outline') || '[]'); } catch { return []; }
+  });
+  const [mergedContent, setMergedContent] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('yibiao_merged_content') || '{}'); } catch { return {}; }
+  });
+  const mergedContentRef = useRef<Record<string, string>>(JSON.parse(
+    (() => { try { return localStorage.getItem('yibiao_merged_content') || '{}'; } catch { return '{}'; } })()
+  ));
   const [isMerging, setIsMerging] = useState(false);
   const [mergeProgressText, setMergeProgressText] = useState('');
 
@@ -116,6 +125,12 @@ const ContentEdit: React.FC<ContentEditProps> = ({
   const [refFileName, setRefFileName] = useState('');
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
+  // 持久化合并版数据（仅最终保存，避免并发期间频繁写入）
+  const persistMerged = (outline: OutlineItem[], content: Record<string, string>) => {
+    try { localStorage.setItem('yibiao_merged_outline', JSON.stringify(outline)); } catch {}
+    try { localStorage.setItem('yibiao_merged_content', JSON.stringify(content)); } catch {}
+  };
+
   const activeOutline = activeTab === 'scoring' ? outlineData : activeTab === 'framework' ? frameworkOutlineData : null;
   const activeLeafItems = activeTab === 'scoring' ? leafItemsScoring : activeTab === 'framework' ? leafItemsFramework : [];
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -153,10 +168,69 @@ const ContentEdit: React.FC<ContentEditProps> = ({
     return [];
   }, []);
 
+  // ── 商务章节过滤：跳过纯商务章节，保留可写的技术性人员配置 ──
+  const filterTechnicalLeaves = useCallback((items: OutlineItem[]): OutlineItem[] => {
+    // 可写：人员配备/团队配置/组织架构（写方案，不需要证书）
+    // 跳过：资质证书/资格证明/财务状况/营业执照/报价（需要真实文件）
+    const isSkippableLeaf = (title: string): boolean => {
+      const t = title.replace(/\s/g, '');
+      if (/人员配备|人员安排|项目团队|组织架构|人员配置|驻场团队/.test(t)) return false;
+      if (/技术条款符合性|偏离说明表|响应说明表|承诺函|技术响应承诺/.test(t)) return true;
+      if (/证书|资质|资格证明|信誉证明|营业执照|纳税|财务报告|审计报告|业绩证明|合同/.test(t)) return true;
+      return false;
+    };
+    const isCommercial = (item: OutlineItem): boolean => {
+      const t = item.title.replace(/\s/g, '');
+      if (/技术/.test(t) && !/技术条款符合性|技术响应|偏离说明|响应说明|承诺函/.test(t)) return false;
+      return /资信|商务|报价|资质|信誉|资格|财务|纳税|价格|技术条款符合性/.test(t);
+    };
+    const commercialIds = new Set<string>();
+    const mark = (list: OutlineItem[], parentCommercial: boolean) => {
+      list.forEach(item => {
+        if (parentCommercial || isCommercial(item)) {
+          commercialIds.add(item.id);
+          if (item.children) mark(item.children, true);
+        } else if (item.children) {
+          mark(item.children, false);
+        }
+      });
+    };
+    mark(items, false);
+
+    const isUnder = (leaf: OutlineItem): boolean => {
+      const parts = leaf.id.split('.');
+      for (let i = parts.length; i > 0; i--) {
+        if (commercialIds.has(parts.slice(0, i).join('.'))) return true;
+      }
+      return false;
+    };
+
+    return collectLeafItems(items).filter(l => !isUnder(l) && !isSkippableLeaf(l.title));
+  }, [collectLeafItems]);
+
+  // ── 预算→篇幅目标计算 ──
+  const getTargetWords = useCallback(() => {
+    const ov = projectOverview || '';
+    const budgetMatch = ov.match(/预算金额[：:]\s*(\d[\d,.]*)\s*万?元?/);
+    let budgetWan = 0;
+    if (budgetMatch) {
+      budgetWan = parseFloat(budgetMatch[1].replace(/,/g, ''));
+      if (!ov.includes('万') && budgetWan > 1000) budgetWan /= 10000; // 元→万
+    }
+    let wordsPerPoint: number;
+    if (budgetWan < 200) wordsPerPoint = 3200;       // 4页×800字
+    else if (budgetWan < 400) wordsPerPoint = 8000;   // 10页×800字
+    else wordsPerPoint = 8000;                         // 基础+超额另算
+    // 估算总分：从techRequirements提取
+    const scoreMatch = techRequirements.match(/服务技术方案[共]?\s*(\d+)\s*分/);
+    const totalScore = scoreMatch ? parseInt(scoreMatch[1]) : 36;
+    return { wordsPerPoint, totalScore };
+  }, [projectOverview, techRequirements]);
+
   // ── sync leaf items from outline ──
   useEffect(() => {
     if (outlineData) {
-      const leaves = collectLeafItems(outlineData.outline);
+      const leaves = filterTechnicalLeaves(outlineData.outline);
       draftStorage.filterContentByOutlineLeaves(outlineData.outline).then(filtered => {
         const merged = leaves.map(l => {
           const cached = filtered[l.id];
@@ -166,38 +240,11 @@ const ContentEdit: React.FC<ContentEditProps> = ({
       });
       setProgress(prev => ({ ...prev, total: leaves.length }));
     }
-  }, [outlineData, collectLeafItems]);
+  }, [outlineData, filterTechnicalLeaves]);
 
   useEffect(() => {
     if (frameworkOutlineData) {
-      const allLeaves = collectLeafItems(frameworkOutlineData.outline);
-      // 跳过资信/商务部分，只留技术部分
-      const isCommercial = (item: OutlineItem): boolean => {
-        const t = item.title.replace(/\s/g, '');
-        if (/技术/.test(t)) return false; // 含"技术"就不是商业
-        return /资信|商务|报价|资质|信誉|资格|财务|纳税/.test(t);
-      };
-      // 找到商业父节点，排除其下的叶子
-      const commercialParentIds = new Set<string>();
-      const markCommercial = (items: OutlineItem[], commercial: boolean) => {
-        items.forEach(item => {
-          if (commercial || isCommercial(item)) {
-            commercialParentIds.add(item.id);
-            if (item.children) markCommercial(item.children, true);
-          } else if (item.children) {
-            markCommercial(item.children, false);
-          }
-        });
-      };
-      markCommercial(frameworkOutlineData.outline, false);
-      const isUnderCommercial = (item: OutlineItem): boolean => {
-        const parts = item.id.split('.');
-        for (let i = parts.length; i > 0; i--) {
-          if (commercialParentIds.has(parts.slice(0, i).join('.'))) return true;
-        }
-        return false;
-      };
-      const leaves = allLeaves.filter(l => !isUnderCommercial(l));
+      const leaves = filterTechnicalLeaves(frameworkOutlineData.outline);
       draftStorage.filterContentByOutlineLeaves(frameworkOutlineData.outline).then(filtered => {
         const merged = leaves.map(l => {
           const cached = filtered[l.id];
@@ -207,7 +254,18 @@ const ContentEdit: React.FC<ContentEditProps> = ({
       });
       if (activeTab === 'framework') setProgress(prev => ({ ...prev, total: leaves.length }));
     }
-  }, [frameworkOutlineData, collectLeafItems, activeTab]);
+  }, [frameworkOutlineData, filterTechnicalLeaves, activeTab]);
+
+  // 从后端恢复合并版数据
+  useEffect(() => {
+    mergeApi.loadResult().then(res => {
+      if (res.data?.outline?.length) {
+        setMergedOutline(res.data.outline);
+        mergedContentRef.current = res.data.content || {};
+        setMergedContent(res.data.content || {});
+      }
+    }).catch(() => {});
+  }, []);
 
   // scroll
   useEffect(() => {
@@ -218,22 +276,13 @@ const ContentEdit: React.FC<ContentEditProps> = ({
     return () => (el || window).removeEventListener('scroll', h);
   }, []);
 
-  // ── build document string for review (max 15000 chars) ──
+  // ── build document string for review/scoring (全文，不再截断章节) ──
   const buildDocumentContent = (items: OutlineItem[]): string => {
-    const MAX_LEN = 12000;
     const parts: string[] = [];
-    let total = 0;
     for (const item of items) {
       const content = item.content || '';
-      const header = `## ${item.id} ${item.title}`;
-      const body = content.length > 2000 ? content.slice(0, 2000) + '…' : content;
-      const chunk = `${header}\n\n${body}`;
-      if (total + chunk.length > MAX_LEN) {
-        parts.push(`\n…（后续 ${items.length - parts.length} 个章节已截断）`);
-        break;
-      }
-      parts.push(chunk);
-      total += chunk.length;
+      if (!content) continue;
+      parts.push(`## ${item.id} ${item.title}\n\n${content}`);
     }
     return parts.join('\n\n');
   };
@@ -275,10 +324,14 @@ const ContentEdit: React.FC<ContentEditProps> = ({
     setProgress(prev => ({ ...prev, current: item.title, generating: new Set(Array.from(prev.generating).concat(item.id)) }));
 
     try {
-      const scoringCtx = activeTab === 'scoring' ? techRequirements : '';
+      const scoringCtx = techRequirements || '';
       const frameworkCtx = activeTab === 'framework' ? (bidFramework || '').slice(0, 2000) : '';
       const parents = getParentChapters(item.id, outline.outline);
       const siblings = getSiblingChapters(item.id, outline.outline);
+
+      const { wordsPerPoint, totalScore } = getTargetWords();
+      const chapterCount = activeLeafItems.length || 1;
+      const targetWords = Math.round(wordsPerPoint * totalScore / chapterCount);
 
       const req: ChapterContentRequest = {
         chapter: item,
@@ -287,6 +340,7 @@ const ContentEdit: React.FC<ContentEditProps> = ({
         project_overview: projectOverview,
         scoring_context: scoringCtx || undefined,
         framework_context: frameworkCtx || undefined,
+        target_words: targetWords || undefined,
       };
 
       const response = await contentApi.generateChapterContentStream(req);
@@ -319,6 +373,9 @@ const ContentEdit: React.FC<ContentEditProps> = ({
       return;
     }
     setIsGenerating(true); setStage('generating'); setMessage(null); setGapResult(null); setScoreResult(null);
+    // 清除旧内容（React state + IndexedDB + localStorage）
+    _setActiveLeafItems(prev => prev.map(l => ({ ...l, content: '' })));
+    idbStorage.clearAll().catch(() => {});
     setProgress({ total: activeLeafItems.length, completed: 0, current: '', failed: [], generating: new Set() });
     startTimer('generate');
 
@@ -360,6 +417,7 @@ const ContentEdit: React.FC<ContentEditProps> = ({
         setMessage({ type: 'error', text: `${progress.failed.length} 个章节生成失败: ${progress.failed.slice(0, 5).join('、')}，耗时 ${formatDuration(elapsed)}` });
       } else {
         setMessage({ type: 'success', text: `正文生成完成，共 ${updated.length} 个章节，耗时 ${formatDuration(elapsed)}` });
+        syncAllState();
       }
     } catch (e) {
       stopTimer();
@@ -386,6 +444,7 @@ const ContentEdit: React.FC<ContentEditProps> = ({
       const elapsed = stopTimer();
       setStage('idle');
       setMessage({ type: 'success', text: `缺口分析完成，发现 ${res.data.gaps?.length || 0} 个问题，耗时 ${formatDuration(elapsed)}` });
+      syncAllState();
     } catch (e) {
       stopTimer();
       setMessage({ type: 'error', text: getErrorMessage(e, '缺口分析失败') });
@@ -404,10 +463,15 @@ const ContentEdit: React.FC<ContentEditProps> = ({
       const res = await reviewApi.scoringTable({
         document_content: doc,
         scoring_criteria: techRequirements,
+        gap_analysis_json: gapResult ? JSON.stringify(gapResult) : '',
       });
       setScoreResult(res.data);
+      const elapsed = stopTimer();
       setStage('idle');
+      setMessage({ type: 'success', text: `评分完成，总分 ${res.data.total}/${res.data.max_total}，耗时 ${formatDuration(elapsed)}` });
+      syncAllState();
     } catch (e) {
+      stopTimer();
       setMessage({ type: 'error', text: getErrorMessage(e, '评分失败') });
       setStage('idle');
     } finally { stopTimer(); }
@@ -415,12 +479,20 @@ const ContentEdit: React.FC<ContentEditProps> = ({
 
   // ── matching helper ──
   const matchCriteriaToTitle = (criteriaName: string, itemTitle: string): boolean => {
-    const clean = (s: string) => s.replace(/[（(]\d+分?[）)]/g, '').replace(/[0-9.、，。：:（）()\s]+/g, '');
+    const clean = (s: string) => s
+      .replace(/[（(][^)）]*[)）]/g, '')   // 去掉括号及内容
+      .replace(/[0-9.、，。：:（）()\s\-\—]+/g, '');
     const cn = clean(criteriaName);
     const tn = clean(itemTitle);
+    if (!cn || !tn) return false;
     if (tn.includes(cn) || cn.includes(tn)) return true;
+    // 拆词匹配
     const words = cn.replace(/(.{2,3})/g, '$1 ').trim().split(/\s+/).filter(w => w.length >= 2);
-    return words.length > 0 && words.some(w => tn.includes(w));
+    if (words.some(w => tn.includes(w))) return true;
+    // 兜底：字符级重叠率 >= 50%
+    const cnChars = new Set(cn.split(''));
+    const overlap = tn.split('').filter(c => cnChars.has(c)).length;
+    return overlap >= cn.length * 0.5;
   };
 
   // ── core optimize logic (no stage management, safe for concurrent calls) ──
@@ -429,12 +501,21 @@ const ContentEdit: React.FC<ContentEditProps> = ({
       ? gapResult.gaps.filter(g => matchCriteriaToTitle(g.criteria_name, item.title))
           .map(g => `[${g.issue_type}] ${g.description} → 建议: ${g.suggestion}`).join('\n')
       : '';
+    // 同级章节摘要（避免优化后与相邻章节重复）
+    const outline = activeOutline;
+    const siblings = outline ? getSiblingChapters(item.id, outline.outline) : [];
+    const siblingSummaries = siblings
+      .filter(s => s.id !== item.id && s.content)
+      .map(s => `[${s.id}] ${s.title}: ${(s.content || '').slice(0, 200)}`)
+      .join('\n');
+
     const response = await reviewApi.optimizeChapterStream({
       chapter_id: item.id,
       chapter_title: item.title,
       current_content: item.content || '',
       scoring_criteria: techRequirements,
       gap_suggestions: gapSuggestions,
+      sibling_summaries: siblingSummaries || undefined,
       reference_docs: referenceDoc || undefined,
     });
     const updated = { ...item };
@@ -496,7 +577,25 @@ const ContentEdit: React.FC<ContentEditProps> = ({
 
     const elapsed = stopTimer();
     setStage('idle');
-    setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，耗时 ${formatDuration(elapsed)}` });
+    setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，耗时 ${formatDuration(elapsed)}，正在自动重新审查评分...` });
+    syncAllState();
+
+    // 自动重新审查+评分，展示优化效果
+    try {
+      const doc = getCurrentDocument();
+      const gapRes = await reviewApi.gapAnalysis({ document_content: doc, scoring_criteria: techRequirements });
+      setGapResult(gapRes.data);
+      const scoreRes = await reviewApi.scoringTable({
+        document_content: doc, scoring_criteria: techRequirements,
+        gap_analysis_json: gapRes.data ? JSON.stringify(gapRes.data) : '',
+      });
+      setScoreResult(scoreRes.data);
+      setStage('idle');
+      setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，耗时 ${formatDuration(elapsed)}，复查完成` });
+      syncAllState();
+    } catch {
+      setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，耗时 ${formatDuration(elapsed)}（复查失败，请手动点②③）` });
+    }
   };
 
   // ── merge ──
@@ -518,6 +617,7 @@ const ContentEdit: React.FC<ContentEditProps> = ({
     try {
       const prepRes = await mergeApi.prepare({
         framework_outline: frameworkOutlineData.outline,
+        scoring_outline: outlineData?.outline || [],
         scoring_criteria: techRequirements,
         scoring_content_map: scoringMap,
         framework_content_map: frameworkMap,
@@ -526,62 +626,107 @@ const ContentEdit: React.FC<ContentEditProps> = ({
 
       const mergedOutline = prepRes.data.outline;
       const matches = prepRes.data.matches;
+      mergedContentRef.current = {};
       setMergedOutline(mergedOutline);
+      setMergedContent({});
       setMergeProgressText(`目录融合完成，${matches.length} 个匹配节点`);
 
-      // 收集叶子节点
-      const leaves: any[] = [];
-      const walk = (items: any[]) => {
-        for (const item of items) {
-          if (item.children?.length) walk(item.children);
-          else leaves.push(item);
+      // 只取技术部分叶子（跳过商务/资信/报价等非技术章节）
+      const isTechNode = (title: string): boolean => {
+        const t = title.replace(/\s/g, '');
+        return /技术|方案|服务|巡检|维护|备份|优化|故障|保障|安全|响应|对接|升级|应急|平台|摄像/.test(t) &&
+               !/证书|资质|资格证明|信誉证明|营业执照|纳税|财务报告|审计报告|业绩证明|合同|报价|投标书|开标|分项/.test(t);
+      };
+      // 在合并目录中找到技术部分根节点
+      const findTechRoots = (list: any[]): any[] => {
+        const roots: any[] = [];
+        for (const item of list) {
+          if (isTechNode(item.title)) {
+            roots.push(item);
+          } else if (item.children?.length) {
+            roots.push(...findTechRoots(item.children));
+          }
+        }
+        return roots;
+      };
+      const techRoots = findTechRoots(mergedOutline);
+      const techLeaves: any[] = [];
+      const walkTech = (list: any[]) => {
+        for (const item of list) {
+          if (item.children?.length) walkTech(item.children);
+          else techLeaves.push(item);
         }
       };
-      walk(mergedOutline);
+      walkTech(techRoots);
+      // 过滤跳过需要真实文件的叶子
+      const leaves = techLeaves.filter((l: any) => {
+        const t = (l.title || '').replace(/\s/g, '');
+        if (/人员配备|人员安排|项目团队|组织架构|人员配置|驻场团队/.test(t)) return true;
+        if (/证书|资质|资格证明|信誉证明|营业执照|纳税|财务报告|审计报告|业绩证明|合同/.test(t)) return false;
+        return true;
+      });
 
       const matchMap: Record<string, any> = {};
       matches.forEach((m: any) => { matchMap[m.node_id] = m; });
 
-      // Phase 3: 逐章合成（独立请求，不依赖长 SSE 流）
-      const contentResult: Record<string, string> = {};
-      for (let i = 0; i < leaves.length; i++) {
-        const leaf = leaves[i];
-        const match = matchMap[leaf.id] || {};
-        const scoringSrcIds = (match.scoring_sources || []).map((s: any) => s.id);
-        const frameworkSrcIds = (match.framework_sources || []).map((s: any) => s.id);
-        const scoringContent = scoringSrcIds.map((id: string) => scoringMap[id] || '').join('\n\n');
-        const frameworkContent = frameworkSrcIds.map((id: string) => frameworkMap[id] || '').join('\n\n');
+      // Phase 3: 逐章合成（5并发，跳过无内容输入的叶子）
+      const concurrency = 5;
+      let completed = 0;
+      for (let i = 0; i < leaves.length; i += concurrency) {
+        const batch = leaves.slice(i, i + concurrency);
+        await Promise.all(batch.map(async (leaf) => {
+          const match = matchMap[leaf.id] || {};
+          const scoringSrcIds = (match.scoring_sources || []).map((s: any) => s.id);
+          const frameworkSrcIds = (match.framework_sources || []).map((s: any) => s.id);
+          const scoringContent = scoringSrcIds.map((id: string) => scoringMap[id] || '').join('\n\n');
+          const frameworkContent = frameworkSrcIds.map((id: string) => frameworkMap[id] || '').join('\n\n');
 
-        const criteriaNames: string[] = leaf.covers_criteria || [];
-        let gapSuggestions = '';
-        if (gapResult) {
-          gapSuggestions = gapResult.gaps
-            .filter((g: any) => criteriaNames.some((cn: string) => g.criteria_name.includes(cn)))
-            .map((g: any) => `[${g.issue_type}] ${g.description} → ${g.suggestion}`)
-            .slice(0, 5).join('\n');
-        }
+          // 两版都没内容 → 跳过合成，直接标空
+          if (!scoringContent.trim() && !frameworkContent.trim()) {
+            completed++;
+            setMergeProgressText(`Phase 3: 跳过 [${completed}/${leaves.length}] ${leaf.title}(无内容输入)`);
+            return;
+          }
 
-        setMergeProgressText(`Phase 3: 合成章节 [${i+1}/${leaves.length}] ${leaf.title}...`);
-        try {
-          const synRes = await mergeApi.synthesize({
-            node_id: leaf.id,
-            node_title: leaf.title,
-            node_description: leaf.description || '',
-            covers_criteria: criteriaNames.join(', '),
-            scoring_content: scoringContent,
-            framework_content: frameworkContent,
-            gap_suggestions: gapSuggestions,
-          });
-          contentResult[leaf.id] = synRes.data.content;
-        } catch {
-          contentResult[leaf.id] = scoringContent || frameworkContent || '（内容合成失败）';
-        }
+          const criteriaNames: string[] = leaf.covers_criteria || [];
+          let gapSuggestions = '';
+          if (gapResult) {
+            gapSuggestions = gapResult.gaps
+              .filter((g: any) => criteriaNames.some((cn: string) => g.criteria_name.includes(cn)))
+              .map((g: any) => `[${g.issue_type}] ${g.description} → ${g.suggestion}`)
+              .slice(0, 5).join('\n');
+          }
+
+          try {
+            const { wordsPerPoint, totalScore } = getTargetWords();
+            const mt = wordsPerPoint > 0 ? Math.round(wordsPerPoint * totalScore / Math.max(leaves.length, 1)) : undefined;
+            const synRes = await mergeApi.synthesize({
+              node_id: leaf.id,
+              node_title: leaf.title,
+              node_description: leaf.description || '',
+              covers_criteria: criteriaNames.join(', '),
+              scoring_content: scoringContent,
+              framework_content: frameworkContent,
+              gap_suggestions: gapSuggestions,
+              target_words: mt,
+            });
+            mergedContentRef.current[leaf.id] = synRes.data.content;
+            setMergedContent(prev => ({ ...prev, [leaf.id]: synRes.data.content }));
+          } catch {
+            mergedContentRef.current[leaf.id] = scoringContent || frameworkContent || '（内容合成失败）';
+            setMergedContent(prev => ({ ...prev, [leaf.id]: scoringContent || frameworkContent || '（内容合成失败）' }));
+          } finally {
+            completed++;
+            setMergeProgressText(`Phase 3: 合成章节 [${completed}/${leaves.length}] ${leaf.title}...`);
+          }
+        }));
       }
-
-      setMergedContent(contentResult);
+      persistMerged(mergedOutline, mergedContentRef.current);
+      mergeApi.saveResult({ outline: mergedOutline, content: mergedContentRef.current }).catch(() => {});
       switchTab('merged');
       const elapsed = stopTimer();
       setMessage({ type: 'success', text: `合并完成！共合成 ${leaves.length} 个章节，耗时 ${formatDuration(elapsed)}` });
+      syncAllState();
     } catch (e) {
       stopTimer();
       setMessage({ type: 'error', text: getErrorMessage(e, '合并失败') });
@@ -591,13 +736,29 @@ const ContentEdit: React.FC<ContentEditProps> = ({
   };
 
   // ── reference doc upload ──
-  const handleRefUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRefUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setRefFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = () => setReferenceDoc(reader.result as string);
-    reader.readAsText(file);
+    if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+      const reader = new FileReader();
+      reader.onload = () => setReferenceDoc(reader.result as string);
+      reader.readAsText(file);
+    } else {
+      // docx/pdf: 通过后端提取文本
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const resp = await documentApi.uploadFile(file);
+        if (resp.data.success && resp.data.file_content) {
+          setReferenceDoc(resp.data.file_content);
+        } else {
+          setMessage({ type: 'error', text: '参考方案解析失败: ' + resp.data.message });
+        }
+      } catch {
+        setMessage({ type: 'error', text: '参考方案上传失败' });
+      }
+    }
   };
 
   // ── export ──
@@ -619,8 +780,8 @@ const ContentEdit: React.FC<ContentEditProps> = ({
           project_overview: projectOverview,
           outline: buildExport(mergedOutline),
         };
-        const resp = await documentApi.exportWord(payload);
-        saveAs(await resp.blob(), `${payload.project_name}.docx`);
+        const blob = await documentApi.exportWord(payload);
+        saveAs(blob, `${payload.project_name}.docx`);
         const elapsed = stopTimer();
         setMessage({ type: 'success', text: `导出成功，耗时 ${formatDuration(elapsed)}` });
       } catch (e) {
@@ -647,8 +808,8 @@ const ContentEdit: React.FC<ContentEditProps> = ({
         project_overview: outline.project_overview || projectOverview,
         outline: buildExport(outline.outline),
       };
-      const resp = await documentApi.exportWord(payload);
-      saveAs(await resp.blob(), `${payload.project_name}.docx`);
+      const blob = await documentApi.exportWord(payload);
+      saveAs(blob, `${payload.project_name}.docx`);
       const elapsed = stopTimer();
       setMessage({ type: 'success', text: `导出成功，耗时 ${formatDuration(elapsed)}` });
     } catch (e) {
@@ -799,7 +960,7 @@ const ContentEdit: React.FC<ContentEditProps> = ({
           </button>
 
           <button onClick={handleOptimizeAll}
-            disabled={isGenerating || isMerging || stage !== 'idle' || (!gapResult && !scoreResult) || activeTab === 'merged'}
+            disabled={isGenerating || isMerging || stage !== 'idle' || (!gapResult && !scoreResult)}
             className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400">
             <SparklesIcon className="w-4 h-4 mr-1" />④ 优化薄弱章节
           </button>
@@ -818,8 +979,8 @@ const ContentEdit: React.FC<ContentEditProps> = ({
 
           {/* 参考方案上传 */}
           <label className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-dashed border-purple-300 text-purple-600 bg-purple-50 hover:bg-purple-100 cursor-pointer">
-            📎 {refFileName || '上传参考方案(.txt)'}
-            <input type="file" accept=".txt,.md" onChange={handleRefUpload} className="hidden" />
+            📎 {refFileName || '上传参考方案(.txt/.docx/.pdf)'}
+            <input type="file" accept=".txt,.md,.docx,.pdf" onChange={handleRefUpload} className="hidden" />
           </label>
         </div>
 
@@ -845,9 +1006,19 @@ const ContentEdit: React.FC<ContentEditProps> = ({
         )}
 
         {stage === 'optimizing' && (
-          <div className="mt-3 text-sm text-purple-600 flex items-center">
-            <div className="animate-spin h-4 w-4 border-2 border-purple-600 border-t-transparent rounded-full mr-2" />
-            正在优化章节内容...
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+              <span className="text-purple-600 flex items-center">
+                <div className="animate-spin h-3 w-3 border-2 border-purple-600 border-t-transparent rounded-full mr-1.5" />
+                正在优化章节内容
+              </span>
+              {progress.total > 0 && <span>{progress.completed}/{progress.total}</span>}
+            </div>
+            {progress.total > 0 && (
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-purple-600 h-2 rounded-full transition-all" style={{ width: `${(progress.completed / Math.max(progress.total, 1)) * 100}%` }} />
+              </div>
+            )}
           </div>
         )}
 

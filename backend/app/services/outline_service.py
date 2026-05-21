@@ -1,6 +1,7 @@
 """目录生成服务。"""
 
 import json
+import re
 from typing import Any, Dict
 
 from ..models.schemas import (
@@ -33,6 +34,43 @@ from ..utils.prompts.outline_prompts import (
 class OutlineService:
     """负责目录生成、审核与技术评分项对齐。"""
 
+    @staticmethod
+    def _build_project_overview(pid: str) -> dict:
+        """构建项目概述节点。"""
+        return {
+            "id": f"{pid}.1",
+            "title": "项目概述",
+            "description": "基于项目实际情况，分析现状、背景、原则、内容、重难点及建议",
+            "children": [
+                {"id": f"{pid}.1.1", "title": "现状分析", "description": "分析当前系统运维现状及存在的问题"},
+                {"id": f"{pid}.1.2", "title": "项目背景", "description": "说明项目立项背景及必要性"},
+                {"id": f"{pid}.1.3", "title": "建设原则", "description": "阐述项目建设遵循的技术及管理原则"},
+                {"id": f"{pid}.1.4", "title": "建设内容", "description": "详细列出本项目的建设范围及内容"},
+                {"id": f"{pid}.1.5", "title": "重难点分析", "description": "分析项目实施中的重点和难点"},
+                {"id": f"{pid}.1.6", "title": "合理化建议", "description": "提出针对性的优化及实施建议"},
+            ],
+        }
+
+    @staticmethod
+    def _is_technical(title: str) -> bool:
+        """判断是否为技术类章节。"""
+        return not re.search(r'商务|报价|资信|资格证明|信誉|纳税|财务|开标|分项|投标书|其他资料', title)
+
+    @staticmethod
+    def _inject_project_overview_before_ai(parent_item: dict, is_first: bool = True) -> dict:
+        """在 AI 生成子目录之前，仅第一个技术类父节点预置项目概述。"""
+        title = str(parent_item.get("title", ""))
+        if not is_first or not OutlineService._is_technical(title):
+            return parent_item
+        existing = parent_item.get("children") or []
+        if any("项目概述" in str(c.get("title", "")) for c in existing):
+            return parent_item
+        pid = parent_item.get("id", "1")
+        proj = OutlineService._build_project_overview(pid)
+        existing.insert(0, proj)
+        parent_item["children"] = existing
+        return parent_item
+
     def __init__(self, ai: OpenAIUtil | None = None):
         self.ai = ai or OpenAIUtil()
 
@@ -61,6 +99,7 @@ class OutlineService:
                 raise AppError("框架结构模式需要提供投标文件框架结构", status_code=400)
             return await self._generate_framework_outline_workflow(
                 overview=overview,
+                requirements=requirements,
                 framework_structure=framework_structure,
                 progress_callback=progress_callback,
             )
@@ -167,6 +206,8 @@ class OutlineService:
             requirements=requirements,
             progress_callback=progress_callback,
         )
+        # 过滤掉"技术条款符合性"——不需要写内容
+        groups = [g for g in groups if '技术条款符合性' not in str(g.get('title', ''))]
 
         await self.ai.emit_progress(
             progress_callback, "技术评分大类提取完成，正在构建一级目录。"
@@ -212,6 +253,7 @@ class OutlineService:
                 progress_callback=progress_callback,
                 suggestions=suggestions,
             )
+            revised_groups = [g for g in revised_groups if '技术条款符合性' not in str(g.get('title', ''))]
             second_outline = await self._generate_aligned_outline(
                 overview=overview,
                 requirements=requirements,
@@ -298,13 +340,19 @@ class OutlineService:
             raise ValueError("技术评分大类标题不能重复")
 
     @staticmethod
+    @staticmethod
+    def _clean_title(title: str) -> str:
+        """去除标题中自带的编号前缀（如 '1. 投标书' → '投标书'）。"""
+        import re
+        return re.sub(r'^[\d]+[\.\)、\s]+', '', title.strip())
+
     def _build_top_level_outline_from_groups(
-        groups: list[dict[str, Any]],
+        self, groups: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         """根据技术评分大类直接构造一级目录。"""
         outline: list[dict[str, Any]] = []
         for index, group in enumerate(groups, start=1):
-            title = str(group.get("title") or "").strip()
+            title = self._clean_title(str(group.get("title") or "").strip())
             outline.append(
                 {
                     "id": str(index),
@@ -363,10 +411,12 @@ class OutlineService:
                 f"正在生成第 {index}/{len(top_level_items)} 个评分大类的二三级目录：{item.get('title', '未命名章节')}。",
             )
             merged_item = dict(item)
+            is_first = (index == 1)
+            item_with_proj = self._inject_project_overview_before_ai(dict(item), is_first)
             children_response = await self._generate_outline_children_for_group(
                 overview=overview,
                 requirements=requirements,
-                parent_item=item,
+                parent_item=item_with_proj,
                 requirement_group=group,
                 uploaded_expand=uploaded_expand,
                 old_outline=old_outline,
@@ -747,6 +797,7 @@ class OutlineService:
     async def _generate_framework_outline_workflow(
         self,
         overview: str,
+        requirements: str,
         framework_structure: str,
         progress_callback: ProgressCallback | None = None,
     ) -> Dict[str, Any]:
@@ -756,6 +807,7 @@ class OutlineService:
             framework_structure=framework_structure,
             progress_callback=progress_callback,
         )
+        groups = [g for g in groups if '技术条款符合性' not in str(g.get('title', ''))]
 
         await self.ai.emit_progress(
             progress_callback, "框架分组提取完成，正在构建一级目录。"
@@ -763,6 +815,7 @@ class OutlineService:
         first_outline = await self._generate_framework_outline(
             overview=overview,
             groups=groups,
+            requirements=requirements,
             progress_callback=progress_callback,
         )
 
@@ -795,9 +848,11 @@ class OutlineService:
                 progress_callback=progress_callback,
                 suggestions=suggestions,
             )
+            revised_groups = [g for g in revised_groups if '技术条款符合性' not in str(g.get('title', ''))]
             second_outline = await self._generate_framework_outline(
                 overview=overview,
                 groups=revised_groups,
+                requirements=requirements,
                 progress_callback=progress_callback,
                 suggestions=suggestions,
             )
@@ -854,6 +909,7 @@ class OutlineService:
         self,
         overview: str,
         groups: list[dict[str, Any]],
+        requirements: str,
         progress_callback: ProgressCallback | None,
         suggestions: list[str] | None = None,
     ) -> Dict[str, Any]:
@@ -867,10 +923,13 @@ class OutlineService:
                 f"正在生成第 {index}/{len(top_level_items)} 个框架分组的子目录：{item.get('title', '未命名章节')}。",
             )
             merged_item = dict(item)
+            is_first = (index == 1)
+            item_with_proj = self._inject_project_overview_before_ai(dict(item), is_first)
             children_response = await self._generate_framework_children(
                 overview=overview,
-                parent_item=item,
+                parent_item=item_with_proj,
                 framework_group=group,
+                requirements=requirements,
                 suggestions=suggestions,
                 progress_callback=progress_callback,
             )
@@ -889,6 +948,7 @@ class OutlineService:
         overview: str,
         parent_item: Dict[str, Any],
         framework_group: Dict[str, Any],
+        requirements: str,
         suggestions: list[str] | None,
         progress_callback: ProgressCallback | None,
     ) -> Dict[str, Any]:
@@ -897,6 +957,7 @@ class OutlineService:
             overview=overview,
             parent_item=parent_item,
             framework_group=framework_group,
+            requirements=requirements,
             suggestions=suggestions,
         )
 

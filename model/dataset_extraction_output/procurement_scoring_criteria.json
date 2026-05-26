@@ -1,0 +1,585 @@
+{
+  "source": {
+    "procurement_score_units": "model/dataset_extraction_output/procurement_score_units_mimo_refined.json",
+    "method": "rule_split_v0_mimo_structured",
+    "task": "criteria_extraction_without_scoring"
+  },
+  "criteria": [
+    {
+      "criterion_id": "PC-001-01",
+      "score_unit_id": "TU-DRAFT-001",
+      "score_unit_name": "报价得分",
+      "criterion_name": "报价得分",
+      "object": "报价得分",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高10分，按采购文件评分标准判断",
+      "score_text": "10分",
+      "scoring_type": "objective",
+      "raw_text": "报价得分 0~10 综合评分法中的价格分统一采用低价优先法计算，即满足招标文件要求且投标价格最低的投标报价为评标基准价，其价格分为满分10分。其他投标人的价格分统一按照下列公式计算：投标报价得分=（评标基准价/投标报价）×10",
+      "source": {
+        "score_unit_page_start": 27,
+        "score_unit_page_end": 27,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-002-01",
+      "score_unit_id": "TU-DRAFT-002",
+      "score_unit_name": "需求理解",
+      "criterion_name": "应用环境、体系结构需求和实施要求等需求内容的理解程度",
+      "object": "应用环境、体系结构需求和实施要求等需求内容",
+      "feature": "理解程度",
+      "evaluation_method": "该细则最高3分，按采购文件评分标准判断",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "raw_text": "应用环境、体系结构需求和实施要求等需求内容的理解程度（3分） 二、评分标准：1、四个评审内容（小项）各3分，总分12分； 2、对应用环境、体系结构需求和实施要求等需求内容的理解透彻；对系统功能需求、性能要求理解程度高；合理化建议、风险分析及控制方案好的；重点、难点问题的分析和措施，与本项目实际相契合的；该小项得3分； 3、有缺漏或不足，但能基本理解项目实际需求的，该小项得2分； 4、有缺漏或不足，不能完全理解项目实际需求的，该小项得1分； 5、方案不合理或无相关方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 27,
+        "score_unit_page_end": 27,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-002-02",
+      "score_unit_id": "TU-DRAFT-002",
+      "score_unit_name": "需求理解",
+      "criterion_name": "系统功能需求、性能要求理解程度",
+      "object": "系统功能需求、性能要求",
+      "feature": "理解程度",
+      "evaluation_method": "该细则最高3分，按采购文件评分标准判断",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "raw_text": "系统功能需求、性能要求理解程度（3分） 二、评分标准：1、四个评审内容（小项）各3分，总分12分； 2、对应用环境、体系结构需求和实施要求等需求内容的理解透彻；对系统功能需求、性能要求理解程度高；合理化建议、风险分析及控制方案好的；重点、难点问题的分析和措施，与本项目实际相契合的；该小项得3分； 3、有缺漏或不足，但能基本理解项目实际需求的，该小项得2分； 4、有缺漏或不足，不能完全理解项目实际需求的，该小项得1分； 5、方案不合理或无相关方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 27,
+        "score_unit_page_end": 27,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-002-03",
+      "score_unit_id": "TU-DRAFT-002",
+      "score_unit_name": "需求理解",
+      "criterion_name": "合理化建议、风险分析及控制方案",
+      "object": "合理化建议、风险分析及控制方案",
+      "feature": "响应内容",
+      "evaluation_method": "该细则最高3分，按采购文件评分标准判断",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "raw_text": "合理化建议、风险分析及控制方案（3分） 二、评分标准：1、四个评审内容（小项）各3分，总分12分； 2、对应用环境、体系结构需求和实施要求等需求内容的理解透彻；对系统功能需求、性能要求理解程度高；合理化建议、风险分析及控制方案好的；重点、难点问题的分析和措施，与本项目实际相契合的；该小项得3分； 3、有缺漏或不足，但能基本理解项目实际需求的，该小项得2分； 4、有缺漏或不足，不能完全理解项目实际需求的，该小项得1分； 5、方案不合理或无相关方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 27,
+        "score_unit_page_end": 27,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-002-04",
+      "score_unit_id": "TU-DRAFT-002",
+      "score_unit_name": "需求理解",
+      "criterion_name": "重点、难点问题的分析与措施",
+      "object": "重点、难点问题",
+      "feature": "分析与措施",
+      "evaluation_method": "该细则最高3分，按采购文件评分标准判断",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "raw_text": "重点、难点问题的分析与措施（3分） 二、评分标准：1、四个评审内容（小项）各3分，总分12分； 2、对应用环境、体系结构需求和实施要求等需求内容的理解透彻；对系统功能需求、性能要求理解程度高；合理化建议、风险分析及控制方案好的；重点、难点问题的分析和措施，与本项目实际相契合的；该小项得3分； 3、有缺漏或不足，但能基本理解项目实际需求的，该小项得2分； 4、有缺漏或不足，不能完全理解项目实际需求的，该小项得1分； 5、方案不合理或无相关方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 27,
+        "score_unit_page_end": 27,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-003-01",
+      "score_unit_id": "TU-DRAFT-003",
+      "score_unit_name": "投标人综合能力",
+      "criterion_name": "投标人的总体履约情况、综合经营能力",
+      "object": "投标人",
+      "feature": "总体履约情况、综合经营能力",
+      "evaluation_method": "该细则最高1分，按采购文件评分标准判断",
+      "score_text": "1分",
+      "scoring_type": "subjective",
+      "raw_text": "投标人的总体履约情况、综合经营能力（1分） 二、评分标准：1、二个评审内容（小项）各1分，总分2分； 2、对投标人的总体履约情况，综合经营能力，社会信用信誉、社会评价、获奖情况等进行综合评价，相对应的小项好的得1分；一般的得0.5分； 3、相对应的小项差的或无相关内容的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 27,
+        "score_unit_page_end": 28,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-003-02",
+      "score_unit_id": "TU-DRAFT-003",
+      "score_unit_name": "投标人综合能力",
+      "criterion_name": "投标人的社会信用信誉、社会评价、获奖情况等",
+      "object": "投标人",
+      "feature": "社会信用信誉、社会评价、获奖情况等",
+      "evaluation_method": "该细则最高1分，按采购文件评分标准判断",
+      "score_text": "1分",
+      "scoring_type": "subjective",
+      "raw_text": "投标人的社会信用信誉、社会评价、获奖情况等（1分） 二、评分标准：1、二个评审内容（小项）各1分，总分2分； 2、对投标人的总体履约情况，综合经营能力，社会信用信誉、社会评价、获奖情况等进行综合评价，相对应的小项好的得1分；一般的得0.5分； 3、相对应的小项差的或无相关内容的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 27,
+        "score_unit_page_end": 28,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-004-01",
+      "score_unit_id": "TU-DRAFT-004",
+      "score_unit_name": "系统建设总体服务方案",
+      "criterion_name": "根据招标文件要求编制详细的技术方案",
+      "object": "技术方案",
+      "feature": "方案详细程度",
+      "evaluation_method": "技术方案与本项目需求的吻合程度高，方案科学、先进、合理；技术方案全面满足各项技术要求；系统安全设计合理、全面的，该方案（小项）得 5分；方案有缺陷的、基本合理，针对性、操作性强的，该方案（小项）得 4分；方案有缺陷的、基本合理，针对性、操作性不强的，该方案（小项） 得2-3分；方案不全面，针对性、操作性不强的，该方案（小项）得1分；方案不合理或无相关方案的，该小项不得分。",
+      "score_text": "5分",
+      "scoring_type": "subjective",
+      "raw_text": "根据招标文件要求编制详细的技术方案（5分） 二、评分标准：1、三个评审内容（小项）各5分，总分15分； 2、技术方案与本项目需求的吻合程度高，方案科学、先进、合理；技术方案全面满足各项技术要求；系统安全设计合理、全面的，该方案（小项）得 5分； 3、方案有缺陷的、基本合理，针对性、操作性强的，该方案（小项）得 4分； 4、方案有缺陷的、基本合理，针对性、操作性不强的，该方案（小项） 得2-3分； 5、方案不全面，针对性、操作性不强的，该方案（小项）得1分； 6、方案不合理或无相关方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 28,
+        "score_unit_page_end": 28,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-004-02",
+      "score_unit_id": "TU-DRAFT-004",
+      "score_unit_name": "系统建设总体服务方案",
+      "criterion_name": "技术方案内容包含系统架构、系统设计、功能说明等内容",
+      "object": "技术方案",
+      "feature": "方案内容完整性",
+      "evaluation_method": "技术方案与本项目需求的吻合程度高，方案科学、先进、合理；技术方案全面满足各项技术要求；系统安全设计合理、全面的，该方案（小项）得 5分；方案有缺陷的、基本合理，针对性、操作性强的，该方案（小项）得 4分；方案有缺陷的、基本合理，针对性、操作性不强的，该方案（小项） 得2-3分；方案不全面，针对性、操作性不强的，该方案（小项）得1分；方案不合理或无相关方案的，该小项不得分。",
+      "score_text": "5分",
+      "scoring_type": "subjective",
+      "raw_text": "技术方案内容包含系统架构、系统设计、功能说明等内容（5分） 二、评分标准：1、三个评审内容（小项）各5分，总分15分； 2、技术方案与本项目需求的吻合程度高，方案科学、先进、合理；技术方案全面满足各项技术要求；系统安全设计合理、全面的，该方案（小项）得 5分； 3、方案有缺陷的、基本合理，针对性、操作性强的，该方案（小项）得 4分； 4、方案有缺陷的、基本合理，针对性、操作性不强的，该方案（小项） 得2-3分； 5、方案不全面，针对性、操作性不强的，该方案（小项）得1分； 6、方案不合理或无相关方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 28,
+        "score_unit_page_end": 28,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-004-03",
+      "score_unit_id": "TU-DRAFT-004",
+      "score_unit_name": "系统建设总体服务方案",
+      "criterion_name": "系统安全设计",
+      "object": "技术方案",
+      "feature": "安全设计质量",
+      "evaluation_method": "技术方案与本项目需求的吻合程度高，方案科学、先进、合理；技术方案全面满足各项技术要求；系统安全设计合理、全面的，该方案（小项）得 5分；方案有缺陷的、基本合理，针对性、操作性强的，该方案（小项）得 4分；方案有缺陷的、基本合理，针对性、操作性不强的，该方案（小项） 得2-3分；方案不全面，针对性、操作性不强的，该方案（小项）得1分；方案不合理或无相关方案的，该小项不得分。",
+      "score_text": "5分",
+      "scoring_type": "subjective",
+      "raw_text": "系统安全设计（5分） 二、评分标准：1、三个评审内容（小项）各5分，总分15分； 2、技术方案与本项目需求的吻合程度高，方案科学、先进、合理；技术方案全面满足各项技术要求；系统安全设计合理、全面的，该方案（小项）得 5分； 3、方案有缺陷的、基本合理，针对性、操作性强的，该方案（小项）得 4分； 4、方案有缺陷的、基本合理，针对性、操作性不强的，该方案（小项） 得2-3分； 5、方案不全面，针对性、操作性不强的，该方案（小项）得1分； 6、方案不合理或无相关方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 28,
+        "score_unit_page_end": 28,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-005-01",
+      "score_unit_id": "TU-DRAFT-005",
+      "score_unit_name": "实施方案",
+      "criterion_name": "实施工作计划",
+      "object": "实施工作计划",
+      "feature": "响应内容",
+      "evaluation_method": "该细则最高4分，按采购文件评分标准判断",
+      "score_text": "4分",
+      "scoring_type": "subjective",
+      "raw_text": "实施工作计划（4分） 二、评分标准：1、三个评审内容（小项）各4分，总分12分； 2、充分考虑了项目实施的环境和条件，制订了完整齐全的实施方案（包括进度计划安排等)，措施及计划安排等内容科学合理，可操作性强。实施方案具体、合理，针对性强；工作流程、时间安排等方面符合项目需求；平台测试（含试运行）等重要环节的方案措施等详细完整的，该小项得4分； 3、方案、计划、措施等基本合理、可靠，工作流程、时间安排等方面基本符合项目需求的，该小项得2-3分； 4、方案、计划、措施等欠合理、可靠，难以满足项目需求的，该小项得1分； 5、无针对本项的方案、计划、措施的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 28,
+        "score_unit_page_end": 29,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-005-02",
+      "score_unit_id": "TU-DRAFT-005",
+      "score_unit_name": "实施方案",
+      "criterion_name": "工作流程、时间安排等",
+      "object": "工作流程、时间安排等",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高4分，按采购文件评分标准判断",
+      "score_text": "4分",
+      "scoring_type": "subjective",
+      "raw_text": "工作流程、时间安排等（4分） 二、评分标准：1、三个评审内容（小项）各4分，总分12分； 2、充分考虑了项目实施的环境和条件，制订了完整齐全的实施方案（包括进度计划安排等)，措施及计划安排等内容科学合理，可操作性强。实施方案具体、合理，针对性强；工作流程、时间安排等方面符合项目需求；平台测试（含试运行）等重要环节的方案措施等详细完整的，该小项得4分； 3、方案、计划、措施等基本合理、可靠，工作流程、时间安排等方面基本符合项目需求的，该小项得2-3分； 4、方案、计划、措施等欠合理、可靠，难以满足项目需求的，该小项得1分； 5、无针对本项的方案、计划、措施的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 28,
+        "score_unit_page_end": 29,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-005-03",
+      "score_unit_id": "TU-DRAFT-005",
+      "score_unit_name": "实施方案",
+      "criterion_name": "平台测试（含试运行）等重要环节的方案措施等",
+      "object": "平台测试（含试运行）等重要环节",
+      "feature": "方案措施等",
+      "evaluation_method": "该细则最高4分，按采购文件评分标准判断",
+      "score_text": "4分",
+      "scoring_type": "subjective",
+      "raw_text": "平台测试（含试运行）等重要环节的方案措施等（4分） 二、评分标准：1、三个评审内容（小项）各4分，总分12分； 2、充分考虑了项目实施的环境和条件，制订了完整齐全的实施方案（包括进度计划安排等)，措施及计划安排等内容科学合理，可操作性强。实施方案具体、合理，针对性强；工作流程、时间安排等方面符合项目需求；平台测试（含试运行）等重要环节的方案措施等详细完整的，该小项得4分； 3、方案、计划、措施等基本合理、可靠，工作流程、时间安排等方面基本符合项目需求的，该小项得2-3分； 4、方案、计划、措施等欠合理、可靠，难以满足项目需求的，该小项得1分； 5、无针对本项的方案、计划、措施的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 28,
+        "score_unit_page_end": 29,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-01",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "生活垃圾分类智慧收运系统-智慧收运PC端",
+      "object": "生活垃圾分类智慧收运系统-智慧收运PC端",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "生活垃圾分类智慧收运系统-智慧收运PC端（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-02",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "生活垃圾分类智慧收运系统-智慧收运移动端",
+      "object": "生活垃圾分类智慧收运系统-智慧收运移动端",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "生活垃圾分类智慧收运系统-智慧收运移动端（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-03",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "生活垃圾分类智慧收运系统-街镇智慧收运监管场景",
+      "object": "生活垃圾分类智慧收运系统-街镇智慧收运监管场景",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "生活垃圾分类智慧收运系统-街镇智慧收运监管场景（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-04",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "环境卫生监管系统",
+      "object": "环境卫生监管系统",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "环境卫生监管系统（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-05",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "综合考核评价系统",
+      "object": "综合考核评价系统",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "综合考核评价系统（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-06",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "综合资料库管理系统",
+      "object": "综合资料库管理系统",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "综合资料库管理系统（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-07",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "可视化指挥软件",
+      "object": "可视化指挥软件",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "可视化指挥软件（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-08",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "数据接口开发",
+      "object": "数据接口开发",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "数据接口开发（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-006-09",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "密码应用建设",
+      "object": "密码应用建设",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "密码应用建设（2分） 二、评分标准：1、九个评审内容（小项）各2分，满分18分； 2、每项提供详细、全面建设（开发）方案且符合需求实际的，该小项得2分； 3、建设（开发）方案不详细，不全面的，该小项得1分； 4、未提供建设内容方案的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 29,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-007-01",
+      "score_unit_id": "TU-DRAFT-007",
+      "score_unit_name": "服务综合支撑能力",
+      "criterion_name": "本地化服务团队配置及服务能力",
+      "object": "本地化服务团队配置及服务能力",
+      "feature": "响应内容",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "本地化服务团队配置及服务能力（2分) 二、评分标准：1、四个评审内容（小项）各2分， 总分8分； 2、具备本地化服务团队配置、服务能力强的；能提供与本项目相关资源情况的；服务响应时间、修复时间、应急预案等符合项目实际的；售后服务人员配备及管理措施完整全面的，该小项得2分; 3、上述服务综合支撑能力小项， 有不足或有缺陷不全面的，该小项得1 分； 4、无相关内容的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 30,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-007-02",
+      "score_unit_id": "TU-DRAFT-007",
+      "score_unit_name": "服务综合支撑能力",
+      "criterion_name": "可提供与本项目相关的资源情况",
+      "object": "可提供与本项目相关的资源情况",
+      "feature": "资源情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "可提供与本项目相关的资源情况（2分） 二、评分标准：1、四个评审内容（小项）各2分， 总分8分； 2、具备本地化服务团队配置、服务能力强的；能提供与本项目相关资源情况的；服务响应时间、修复时间、应急预案等符合项目实际的；售后服务人员配备及管理措施完整全面的，该小项得2分; 3、上述服务综合支撑能力小项， 有不足或有缺陷不全面的，该小项得1 分； 4、无相关内容的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 30,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-007-03",
+      "score_unit_id": "TU-DRAFT-007",
+      "score_unit_name": "服务综合支撑能力",
+      "criterion_name": "服务响应时间、修复时间、应急预案等",
+      "object": "服务响应时间、修复时间、应急预案等",
+      "feature": "响应情况",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "服务响应时间、修复时间、应急预案等（2分) 二、评分标准：1、四个评审内容（小项）各2分， 总分8分； 2、具备本地化服务团队配置、服务能力强的；能提供与本项目相关资源情况的；服务响应时间、修复时间、应急预案等符合项目实际的；售后服务人员配备及管理措施完整全面的，该小项得2分; 3、上述服务综合支撑能力小项， 有不足或有缺陷不全面的，该小项得1 分； 4、无相关内容的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 30,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-007-04",
+      "score_unit_id": "TU-DRAFT-007",
+      "score_unit_name": "服务综合支撑能力",
+      "criterion_name": "售后服务人员配备及管理措施",
+      "object": "售后服务人员配备及管理措施",
+      "feature": "响应内容",
+      "evaluation_method": "该细则最高2分，按采购文件评分标准判断",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "raw_text": "售后服务人员配备及管理措施 (2分) 二、评分标准：1、四个评审内容（小项）各2分， 总分8分； 2、具备本地化服务团队配置、服务能力强的；能提供与本项目相关资源情况的；服务响应时间、修复时间、应急预案等符合项目实际的；售后服务人员配备及管理措施完整全面的，该小项得2分; 3、上述服务综合支撑能力小项， 有不足或有缺陷不全面的，该小项得1 分； 4、无相关内容的，该小项不得分。",
+      "source": {
+        "score_unit_page_start": 30,
+        "score_unit_page_end": 30,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-008-01",
+      "score_unit_id": "TU-DRAFT-008",
+      "score_unit_name": "项目服务团队配备情况",
+      "criterion_name": "项目负责人、技术负责人",
+      "object": "项目负责人、技术负责人",
+      "feature": "证书响应情况",
+      "evaluation_method": "核查项目负责人是否具备信息系统项目管理师（高级）证书和高级工程师（计算机软件及应用)证书，技术负责人是否具备计算机硬件与软件专业方向的工程师职称及信息系统项目管理师（高级）证书。每个证书得1分，总分最高4分。",
+      "score_text": "4分",
+      "scoring_type": "objective",
+      "raw_text": "项目负责人、技术负责人（4 分) 二、评分标准：1、项目负责人具备信息系统项目管理师（高级）证书和高级工程师（计算机软件及应用)，技术负责人具备计算机硬件与软件专业方向的工程师职称及信息系统项目管理师（高级）证书： 每个证书1分，总分4分; 2、团队总体人数配置满足项目需求（不少于20人)，得1分； 3、项目团队成员具备信息系统项目管理师、系统集成项目管理师等，各得1分，满分2分； 4、无相关项目服务团队配备方案的不得分。",
+      "source": {
+        "score_unit_page_start": 30,
+        "score_unit_page_end": 31,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-008-02",
+      "score_unit_id": "TU-DRAFT-008",
+      "score_unit_name": "项目服务团队配备情况",
+      "criterion_name": "团队配备人数",
+      "object": "团队配备人数",
+      "feature": "团队人数配置响应情况",
+      "evaluation_method": "核查团队总体人数配置是否满足项目需求（不少于20人)。满足要求得1分，不满足不得分。",
+      "score_text": "1分",
+      "scoring_type": "objective",
+      "raw_text": "团队配备人数（1分） 二、评分标准：1、项目负责人具备信息系统项目管理师（高级）证书和高级工程师（计算机软件及应用)，技术负责人具备计算机硬件与软件专业方向的工程师职称及信息系统项目管理师（高级）证书： 每个证书1分，总分4分; 2、团队总体人数配置满足项目需求（不少于20人)，得1分； 3、项目团队成员具备信息系统项目管理师、系统集成项目管理师等，各得1分，满分2分； 4、无相关项目服务团队配备方案的不得分。",
+      "source": {
+        "score_unit_page_start": 30,
+        "score_unit_page_end": 31,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-008-03",
+      "score_unit_id": "TU-DRAFT-008",
+      "score_unit_name": "项目服务团队配备情况",
+      "criterion_name": "主要技术人员配备",
+      "object": "主要技术人员配备",
+      "feature": "技术人员证书响应情况",
+      "evaluation_method": "核查项目团队成员是否具备信息系统项目管理师、系统集成项目管理师等证书。每个证书得1分，满分2分。",
+      "score_text": "2分",
+      "scoring_type": "objective",
+      "raw_text": "主要技术人员配备（2分） 二、评分标准：1、项目负责人具备信息系统项目管理师（高级）证书和高级工程师（计算机软件及应用)，技术负责人具备计算机硬件与软件专业方向的工程师职称及信息系统项目管理师（高级）证书： 每个证书1分，总分4分; 2、团队总体人数配置满足项目需求（不少于20人)，得1分； 3、项目团队成员具备信息系统项目管理师、系统集成项目管理师等，各得1分，满分2分； 4、无相关项目服务团队配备方案的不得分。",
+      "source": {
+        "score_unit_page_start": 30,
+        "score_unit_page_end": 31,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-009-01",
+      "score_unit_id": "TU-DRAFT-009",
+      "score_unit_name": "系统调试及验收方案",
+      "criterion_name": "系统调试及验收方案",
+      "object": "系统调试及验收方案",
+      "feature": "响应内容",
+      "evaluation_method": "该细则最高5分，按采购文件评分标准判断",
+      "score_text": "5分",
+      "scoring_type": "subjective",
+      "raw_text": "系统调试及验收方案 0~5 一、评审内容： 系统调试及验收方案二、评分标准： 1、满足在现有环境中系统调试、测试、开通等实际要求，提供的方案完整详尽，管理标准和要求明确、流程清晰合理、实施措施全面到位，能达到相关法律法规政策要求的，得5分； 2、所提供方案的服务内容、标准和要求基本完整、流程合理、实施措施基本齐全的，得3-4分； 3、所提供方案的服务内容、标准、流程、实施措施等不全面，存在明显缺漏的，得1-2分； 4、未提交任何方案，或提交方案完全不匹配项目实际情况且不具备可操作性的，不得分。 二、评分标准：1、满足在现有环境中系统调试、测试、开通等实际要求，提供的方案完整详尽，管理标准和要求明确、流程清晰合理、实施措施全面到位，能达到相关法律法规政策要求的，得5分； 2、所提供方案的服务内容、标准和要求基本完整、流程合理、实施措施基本齐全的，得3-4分； 3、所提供方案的服务内容、标准、流程、实施措施等不全面，存在明显缺漏的，得1-2分； 4、未提交任何方案，或提交方案完全不匹配项目实际情况且不具备可操作性的，不得分。",
+      "source": {
+        "score_unit_page_start": 31,
+        "score_unit_page_end": 31,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-010-01",
+      "score_unit_id": "TU-DRAFT-010",
+      "score_unit_name": "培训方案",
+      "criterion_name": "培训方案",
+      "object": "培训方案",
+      "feature": "响应内容",
+      "evaluation_method": "该细则最高3分，按采购文件评分标准判断",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "raw_text": "培训方案 0~3 一、评审内容：培训方案，需包含培训计划、培训期限、培训人员、培训内容等，且需针对不同人员（管理层、系统管理人员、业务人员），制定不同的培训方案。 二、评分标准： 1、培训方案完整详尽，计划科学合理可行性强，培训期限能够配合采购人需要，培训内容详尽完善，能够针对不同人员制定的，得3分； 2、培训方案能够满足项目基本需要，计划科学合理，有固定的培训期限计划，能针对不同人员制定框架性培训内容的，得2分； 3、培训方案不完整，计划缺乏合理性且可行性有所欠缺，没有明确的培训期限，培训内容针对性不足且缺漏多的，得1分； 4、无相关培训方案的，不得分。 二、评分标准：1、培训方案完整详尽，计划科学合理可行性强，培训期限能够配合采购人需要，培训内容详尽完善，能够针对不同人员制定的，得3分； 2、培训方案能够满足项目基本需要，计划科学合理，有固定的培训期限计划，能针对不同人员制定框架性培训内容的，得2分； 3、培训方案不完整，计划缺乏合理性且可行性有所欠缺，没有明确的培训期限，培训内容针对性不足且缺漏多的，得1分； 4、无相关培训方案的，不得分。",
+      "source": {
+        "score_unit_page_start": 31,
+        "score_unit_page_end": 32,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    },
+    {
+      "criterion_id": "PC-011-01",
+      "score_unit_id": "TU-DRAFT-011",
+      "score_unit_name": "类似项目的经验",
+      "criterion_name": "类似项目的经验",
+      "object": "类似项目",
+      "feature": "经验",
+      "evaluation_method": "服务期限包含2023年1月1日（含）以后的合同；提供合同扫描件（提供合同主要内容、应包括项目名称、盖章页、签订日期），每份1分，满分8分。",
+      "score_text": "8分",
+      "scoring_type": "objective",
+      "raw_text": "类似项目的经验 0~8 一、评审内容： 投标人的类似项目经验。 二、评分标准： 1、服务期限包含2023年1月1日（含）以后的合同；提供合同扫描件（提供合同主要内容、应包括项目名称、盖章页、签订日期），每份1分，满分8分。 二、评分标准：1、服务期限包含2023年1月1日（含）以后的合同；提供合同扫描件（提供合同主要内容、应包括项目名称、盖章页、签订日期），每份1分，满分8分。",
+      "source": {
+        "score_unit_page_start": 32,
+        "score_unit_page_end": 32,
+        "extraction_method": "rule_split_v0",
+        "structure_refiner": "mimo-v2.5-pro"
+      }
+    }
+  ]
+}

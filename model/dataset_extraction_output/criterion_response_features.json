@@ -1,0 +1,4067 @@
+{
+  "source": {
+    "procurement_criteria": "model/dataset_extraction_output/procurement_scoring_criteria.json",
+    "bid_response_fragments": "model/dataset_extraction_output/bid_response_fragments.json",
+    "procurement_bid_mapping": "model/dataset_extraction_output/procurement_bid_mapping.json",
+    "method": "mapping_to_response_feature_rule_extraction_v0",
+    "task": "response_text_feature_extraction_without_scoring"
+  },
+  "features": [
+    {
+      "criterion_id": "PC-001-01",
+      "score_unit_id": "TU-DRAFT-001",
+      "score_unit_name": "报价得分",
+      "criterion_name": "报价得分",
+      "score_text": "10分",
+      "scoring_type": "objective",
+      "linked_fragment_ids": [],
+      "mapping_status": "no_linked_fragment",
+      "subjective_writing_features": null,
+      "objective_evidence_features": {
+        "feature_source": "rule_extraction",
+        "evidence_type": "price_formula",
+        "verification_mode": "公式计算型",
+        "required_evidence_terms_from_criterion": [
+          "报价",
+          "公式",
+          "评标基准价",
+          "投标报价"
+        ],
+        "candidate_evidence_fields": [
+          "投标报价",
+          "评标基准价",
+          "价格分公式"
+        ],
+        "detected_evidence_terms_in_linked_fragments": [],
+        "linked_fragment_stats": {
+          "fragment_count": 0,
+          "char_count": 0,
+          "paragraph_count": 0,
+          "table_count": 0,
+          "image_count": 0,
+          "max_heading_depth": 0
+        },
+        "note": "本结构只描述客观项的证据核验字段，不做得分计算。"
+      },
+      "model_status": "not_applicable"
+    },
+    {
+      "criterion_id": "PC-002-01",
+      "score_unit_id": "TU-DRAFT-002",
+      "score_unit_name": "需求理解",
+      "criterion_name": "应用环境、体系结构需求和实施要求等需求内容的理解程度",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0002",
+        "BF-0003",
+        "BF-0004",
+        "BF-0033"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 4,
+            "char_count": 6618,
+            "paragraph_count": 59,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0002",
+              "heading_path": [
+                "需求理解",
+                "应用环境、体系结构需求与实施要求的理解",
+                "应用环境需求的深度理解"
+              ],
+              "depth": 3,
+              "leaf_heading": "应用环境需求的深度理解"
+            },
+            {
+              "fragment_id": "BF-0003",
+              "heading_path": [
+                "需求理解",
+                "应用环境、体系结构需求与实施要求的理解",
+                "体系结构需求的深度理解"
+              ],
+              "depth": 3,
+              "leaf_heading": "体系结构需求的深度理解"
+            },
+            {
+              "fragment_id": "BF-0004",
+              "heading_path": [
+                "需求理解",
+                "应用环境、体系结构需求与实施要求的理解",
+                "实施要求的深度理解"
+              ],
+              "depth": 3,
+              "leaf_heading": "实施要求的深度理解"
+            },
+            {
+              "fragment_id": "BF-0033",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目重点问题分析与应对措施",
+                "重点五：严格落实项目全流程实施要求，确保项目按时高质量交付"
+              ],
+              "depth": 4,
+              "leaf_heading": "重点五：严格落实项目全流程实施要求，确保项目按时高质量交付"
+            }
+          ],
+          "coverage_terms_found": [
+            "应用环境",
+            "实施要求"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "作业单位",
+            "产生单位",
+            "环卫",
+            "政务云",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "正文使用编号条目承载多个检查点",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 19,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-002-02",
+      "score_unit_id": "TU-DRAFT-002",
+      "score_unit_name": "需求理解",
+      "criterion_name": "系统功能需求、性能要求理解程度",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0005",
+        "BF-0006"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 2,
+            "char_count": 9298,
+            "paragraph_count": 68,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 3
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0005",
+              "heading_path": [
+                "需求理解",
+                "系统功能需求与性能要求的理解",
+                "系统功能需求的深度理解"
+              ],
+              "depth": 3,
+              "leaf_heading": "系统功能需求的深度理解"
+            },
+            {
+              "fragment_id": "BF-0006",
+              "heading_path": [
+                "需求理解",
+                "系统功能需求与性能要求的理解",
+                "系统性能要求的深度理解"
+              ],
+              "depth": 3,
+              "leaf_heading": "系统性能要求的深度理解"
+            }
+          ],
+          "coverage_terms_found": [
+            "系统功能需求",
+            "性能要求"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "产生单位",
+            "环卫",
+            "清运",
+            "政务云",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "正文使用编号条目承载多个检查点",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 27,
+            "max_heading_depth": 3
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-002-03",
+      "score_unit_id": "TU-DRAFT-002",
+      "score_unit_name": "需求理解",
+      "criterion_name": "合理化建议、风险分析及控制方案",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0033",
+        "BF-0034",
+        "BF-0035",
+        "BF-0036",
+        "BF-0022",
+        "BF-0018",
+        "BF-0019",
+        "BF-0020",
+        "BF-0021",
+        "BF-0023",
+        "BF-0024",
+        "BF-0025"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 12,
+            "char_count": 9091,
+            "paragraph_count": 84,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0033",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目重点问题分析与应对措施",
+                "重点五：严格落实项目全流程实施要求，确保项目按时高质量交付"
+              ],
+              "depth": 4,
+              "leaf_heading": "重点五：严格落实项目全流程实施要求，确保项目按时高质量交付"
+            },
+            {
+              "fragment_id": "BF-0034",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目难点问题分析与应对措施",
+                "难点一：多系统、多设备的数据对接与融合，打破数据孤岛"
+              ],
+              "depth": 4,
+              "leaf_heading": "难点一：多系统、多设备的数据对接与融合，打破数据孤岛"
+            },
+            {
+              "fragment_id": "BF-0035",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目难点问题分析与应对措施",
+                "难点二：精准的到站时间预测，实现站牌式收运核心功能"
+              ],
+              "depth": 4,
+              "leaf_heading": "难点二：精准的到站时间预测，实现站牌式收运核心功能"
+            },
+            {
+              "fragment_id": "BF-0036",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目难点问题分析与应对措施",
+                "难点三：复杂场景下的收运作业全流程智能监管，实现违规问题精准识别与闭环处置"
+              ],
+              "depth": 4,
+              "leaf_heading": "难点三：复杂场景下的收运作业全流程智能监管，实现违规问题精准识别与闭环处置"
+            },
+            {
+              "fragment_id": "BF-0022",
+              "heading_path": [
+                "需求理解",
+                "风险分析及控制方案",
+                "项目工期管控风险"
+              ],
+              "depth": 3,
+              "leaf_heading": "项目工期管控风险"
+            },
+            {
+              "fragment_id": "BF-0018",
+              "heading_path": [
+                "需求理解",
+                "风险分析及控制方案"
+              ],
+              "depth": 2,
+              "leaf_heading": "风险分析及控制方案"
+            },
+            {
+              "fragment_id": "BF-0019",
+              "heading_path": [
+                "需求理解",
+                "风险分析及控制方案",
+                "需求调研与范围管控风险"
+              ],
+              "depth": 3,
+              "leaf_heading": "需求调研与范围管控风险"
+            },
+            {
+              "fragment_id": "BF-0020",
+              "heading_path": [
+                "需求理解",
+                "风险分析及控制方案",
+                "政策合规性风险"
+              ],
+              "depth": 3,
+              "leaf_heading": "政策合规性风险"
+            },
+            {
+              "fragment_id": "BF-0021",
+              "heading_path": [
+                "需求理解",
+                "风险分析及控制方案",
+                "数据共享与系统对接风险"
+              ],
+              "depth": 3,
+              "leaf_heading": "数据共享与系统对接风险"
+            },
+            {
+              "fragment_id": "BF-0023",
+              "heading_path": [
+                "需求理解",
+                "风险分析及控制方案",
+                "项目团队管理风险"
+              ],
+              "depth": 3,
+              "leaf_heading": "项目团队管理风险"
+            },
+            {
+              "fragment_id": "BF-0024",
+              "heading_path": [
+                "需求理解",
+                "风险分析及控制方案",
+                "系统性能与稳定性风险"
+              ],
+              "depth": 3,
+              "leaf_heading": "系统性能与稳定性风险"
+            },
+            {
+              "fragment_id": "BF-0025",
+              "heading_path": [
+                "需求理解",
+                "风险分析及控制方案",
+                "用户使用与推广落地风险"
+              ],
+              "depth": 3,
+              "leaf_heading": "用户使用与推广落地风险"
+            }
+          ],
+          "coverage_terms_found": [
+            "控制方案"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "生活垃圾",
+            "垃圾分类",
+            "一网统管",
+            "街镇",
+            "产生单位",
+            "环卫",
+            "清运",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "正文使用编号条目承载多个检查点",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 50,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-002-04",
+      "score_unit_id": "TU-DRAFT-002",
+      "score_unit_name": "需求理解",
+      "criterion_name": "重点、难点问题的分析与措施",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0033",
+        "BF-0029",
+        "BF-0030",
+        "BF-0031",
+        "BF-0032",
+        "BF-0034",
+        "BF-0035",
+        "BF-0036",
+        "BF-0037"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 9,
+            "char_count": 9319,
+            "paragraph_count": 93,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0033",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目重点问题分析与应对措施",
+                "重点五：严格落实项目全流程实施要求，确保项目按时高质量交付"
+              ],
+              "depth": 4,
+              "leaf_heading": "重点五：严格落实项目全流程实施要求，确保项目按时高质量交付"
+            },
+            {
+              "fragment_id": "BF-0029",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目重点问题分析与应对措施",
+                "重点一：严格对标政策要求，完成智慧收运示范线路建设，解决群众核心关切问题"
+              ],
+              "depth": 4,
+              "leaf_heading": "重点一：严格对标政策要求，完成智慧收运示范线路建设，解决群众核心关切问题"
+            },
+            {
+              "fragment_id": "BF-0030",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目重点问题分析与应对措施",
+                "重点二：构建全流程闭环的智慧收运业务体系，实现“一网统管”"
+              ],
+              "depth": 4,
+              "leaf_heading": "重点二：构建全流程闭环的智慧收运业务体系，实现“一网统管”"
+            },
+            {
+              "fragment_id": "BF-0031",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目重点问题分析与应对措施",
+                "重点三：满足多角色用户差异化需求，提升系统实用性与易用性"
+              ],
+              "depth": 4,
+              "leaf_heading": "重点三：满足多角色用户差异化需求，提升系统实用性与易用性"
+            },
+            {
+              "fragment_id": "BF-0032",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目重点问题分析与应对措施",
+                "重点四：落实密码应用建设，满足等保与密码测评合规要求"
+              ],
+              "depth": 4,
+              "leaf_heading": "重点四：落实密码应用建设，满足等保与密码测评合规要求"
+            },
+            {
+              "fragment_id": "BF-0034",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目难点问题分析与应对措施",
+                "难点一：多系统、多设备的数据对接与融合，打破数据孤岛"
+              ],
+              "depth": 4,
+              "leaf_heading": "难点一：多系统、多设备的数据对接与融合，打破数据孤岛"
+            },
+            {
+              "fragment_id": "BF-0035",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目难点问题分析与应对措施",
+                "难点二：精准的到站时间预测，实现站牌式收运核心功能"
+              ],
+              "depth": 4,
+              "leaf_heading": "难点二：精准的到站时间预测，实现站牌式收运核心功能"
+            },
+            {
+              "fragment_id": "BF-0036",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目难点问题分析与应对措施",
+                "难点三：复杂场景下的收运作业全流程智能监管，实现违规问题精准识别与闭环处置"
+              ],
+              "depth": 4,
+              "leaf_heading": "难点三：复杂场景下的收运作业全流程智能监管，实现违规问题精准识别与闭环处置"
+            },
+            {
+              "fragment_id": "BF-0037",
+              "heading_path": [
+                "需求理解",
+                "重点、难点问题的分析与应对措施",
+                "项目难点问题分析与应对措施",
+                "难点四：多用户群体的系统推广与落地，避免重建设、轻应用"
+              ],
+              "depth": 4,
+              "leaf_heading": "难点四：多用户群体的系统推广与落地，避免重建设、轻应用"
+            }
+          ],
+          "coverage_terms_found": [
+            "重点"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "作业单位",
+            "产生单位",
+            "环卫",
+            "清运",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "正文使用编号条目承载多个检查点",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 41,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-003-01",
+      "score_unit_id": "TU-DRAFT-003",
+      "score_unit_name": "投标人综合能力",
+      "criterion_name": "投标人的总体履约情况、综合经营能力",
+      "score_text": "1分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0038",
+        "BF-0039",
+        "BF-0040",
+        "BF-0041",
+        "BF-0042",
+        "BF-0043",
+        "BF-0044",
+        "BF-0045",
+        "BF-0046",
+        "BF-0047"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 10,
+            "char_count": 0,
+            "paragraph_count": 0,
+            "table_count": 0,
+            "image_count": 33,
+            "max_heading_depth": 3
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0038",
+              "heading_path": [
+                "投标人综合能力",
+                "总体履约情况",
+                "“一网统管”物联感知端能力建设项目履约证明"
+              ],
+              "depth": 3,
+              "leaf_heading": "“一网统管”物联感知端能力建设项目履约证明"
+            },
+            {
+              "fragment_id": "BF-0039",
+              "heading_path": [
+                "投标人综合能力",
+                "总体履约情况",
+                "嘉定区垃圾综合治理“一网统管”平台体系建设项目履约证明"
+              ],
+              "depth": 3,
+              "leaf_heading": "嘉定区垃圾综合治理“一网统管”平台体系建设项目履约证明"
+            },
+            {
+              "fragment_id": "BF-0040",
+              "heading_path": [
+                "投标人综合能力",
+                "总体履约情况",
+                "密码应用测评合规证明"
+              ],
+              "depth": 3,
+              "leaf_heading": "密码应用测评合规证明"
+            },
+            {
+              "fragment_id": "BF-0041",
+              "heading_path": [
+                "投标人综合能力",
+                "总体履约情况",
+                "安全测评合规证明"
+              ],
+              "depth": 3,
+              "leaf_heading": "安全测评合规证明"
+            },
+            {
+              "fragment_id": "BF-0042",
+              "heading_path": [
+                "投标人综合能力",
+                "综合经营能力",
+                "专精特新企业"
+              ],
+              "depth": 3,
+              "leaf_heading": "专精特新企业"
+            },
+            {
+              "fragment_id": "BF-0043",
+              "heading_path": [
+                "投标人综合能力",
+                "综合经营能力",
+                "高新企业资质证书"
+              ],
+              "depth": 3,
+              "leaf_heading": "高新企业资质证书"
+            },
+            {
+              "fragment_id": "BF-0044",
+              "heading_path": [
+                "投标人综合能力",
+                "综合经营能力",
+                "软件企业证书"
+              ],
+              "depth": 3,
+              "leaf_heading": "软件企业证书"
+            },
+            {
+              "fragment_id": "BF-0045",
+              "heading_path": [
+                "投标人综合能力",
+                "综合经营能力",
+                "软件产品证书"
+              ],
+              "depth": 3,
+              "leaf_heading": "软件产品证书"
+            },
+            {
+              "fragment_id": "BF-0046",
+              "heading_path": [
+                "投标人综合能力",
+                "综合经营能力",
+                "上海总工程师协会监事单位"
+              ],
+              "depth": 3,
+              "leaf_heading": "上海总工程师协会监事单位"
+            },
+            {
+              "fragment_id": "BF-0047",
+              "heading_path": [
+                "投标人综合能力",
+                "综合经营能力",
+                "CMMI3级"
+              ],
+              "depth": 3,
+              "leaf_heading": "CMMI3级"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [],
+          "content_modules": [],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "使用图片或图示承载架构、流程或关系"
+          ],
+          "execution_elements": [],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": true,
+            "list_marker_count": 0,
+            "max_heading_depth": 3
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-003-02",
+      "score_unit_id": "TU-DRAFT-003",
+      "score_unit_name": "投标人综合能力",
+      "criterion_name": "投标人的社会信用信誉、社会评价、获奖情况等",
+      "score_text": "1分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0056",
+        "BF-0057",
+        "BF-0058",
+        "BF-0059",
+        "BF-0060",
+        "BF-0061",
+        "BF-0062",
+        "BF-0063",
+        "BF-0064",
+        "BF-0065"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 10,
+            "char_count": 0,
+            "paragraph_count": 0,
+            "table_count": 0,
+            "image_count": 46,
+            "max_heading_depth": 3
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0056",
+              "heading_path": [
+                "投标人综合能力",
+                "社会信用信誉",
+                "信用中国"
+              ],
+              "depth": 3,
+              "leaf_heading": "信用中国"
+            },
+            {
+              "fragment_id": "BF-0057",
+              "heading_path": [
+                "投标人综合能力",
+                "社会信用信誉",
+                "中国执行信息公开网"
+              ],
+              "depth": 3,
+              "leaf_heading": "中国执行信息公开网"
+            },
+            {
+              "fragment_id": "BF-0058",
+              "heading_path": [
+                "投标人综合能力",
+                "社会信用信誉",
+                "国家企业信用信息公示系统"
+              ],
+              "depth": 3,
+              "leaf_heading": "国家企业信用信息公示系统"
+            },
+            {
+              "fragment_id": "BF-0059",
+              "heading_path": [
+                "投标人综合能力",
+                "社会信用信誉",
+                "中国政府采购网"
+              ],
+              "depth": 3,
+              "leaf_heading": "中国政府采购网"
+            },
+            {
+              "fragment_id": "BF-0060",
+              "heading_path": [
+                "投标人综合能力",
+                "社会评价",
+                "入选“2025年度创100+创业训练营”"
+              ],
+              "depth": 3,
+              "leaf_heading": "入选“2025年度创100+创业训练营”"
+            },
+            {
+              "fragment_id": "BF-0061",
+              "heading_path": [
+                "投标人综合能力",
+                "社会评价",
+                "入选静安区优质中小企业奖励名单（2023年度）"
+              ],
+              "depth": 3,
+              "leaf_heading": "入选静安区优质中小企业奖励名单（2023年度）"
+            },
+            {
+              "fragment_id": "BF-0062",
+              "heading_path": [
+                "投标人综合能力",
+                "社会评价",
+                "入选2021年静安区人民政府创新创业促进就业优秀企业"
+              ],
+              "depth": 3,
+              "leaf_heading": "入选2021年静安区人民政府创新创业促进就业优秀企业"
+            },
+            {
+              "fragment_id": "BF-0063",
+              "heading_path": [
+                "投标人综合能力",
+                "社会评价",
+                "入选2019年静安区专利资助名单"
+              ],
+              "depth": 3,
+              "leaf_heading": "入选2019年静安区专利资助名单"
+            },
+            {
+              "fragment_id": "BF-0064",
+              "heading_path": [
+                "投标人综合能力",
+                "社会评价",
+                "入选上海科创办张江国家自主创新示范区专项发展资金支持名单"
+              ],
+              "depth": 3,
+              "leaf_heading": "入选上海科创办张江国家自主创新示范区专项发展资金支持名单"
+            },
+            {
+              "fragment_id": "BF-0065",
+              "heading_path": [
+                "投标人综合能力",
+                "社会评价",
+                "入选核心期刊“计算机科学与应用”-“层次聚类和长短期记忆网络(LSTM)混合机器学习模型的数据资产估值模型”"
+              ],
+              "depth": 3,
+              "leaf_heading": "入选核心期刊“计算机科学与应用”-“层次聚类和长短期记忆网络(LSTM)混合机器学习模型的数据资产估值模型”"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [],
+          "content_modules": [],
+          "writing_structure": [
+            "使用图片或图示承载架构、流程或关系"
+          ],
+          "execution_elements": [],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": true,
+            "list_marker_count": 0,
+            "max_heading_depth": 3
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-004-01",
+      "score_unit_id": "TU-DRAFT-004",
+      "score_unit_name": "系统建设总体服务方案",
+      "criterion_name": "根据招标文件要求编制详细的技术方案",
+      "score_text": "5分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [],
+      "mapping_status": "no_linked_fragment",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 0,
+            "char_count": 0,
+            "paragraph_count": 0,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 0
+          },
+          "heading_patterns": [],
+          "coverage_terms_found": [],
+          "project_specific_terms": [],
+          "content_modules": [],
+          "writing_structure": [
+            "围绕评分细则标题展开说明"
+          ],
+          "execution_elements": [],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 0
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-004-02",
+      "score_unit_id": "TU-DRAFT-004",
+      "score_unit_name": "系统建设总体服务方案",
+      "criterion_name": "技术方案内容包含系统架构、系统设计、功能说明等内容",
+      "score_text": "5分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [],
+      "mapping_status": "no_linked_fragment",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 0,
+            "char_count": 0,
+            "paragraph_count": 0,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 0
+          },
+          "heading_patterns": [],
+          "coverage_terms_found": [],
+          "project_specific_terms": [],
+          "content_modules": [],
+          "writing_structure": [
+            "围绕评分细则标题展开说明"
+          ],
+          "execution_elements": [],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 0
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-004-03",
+      "score_unit_id": "TU-DRAFT-004",
+      "score_unit_name": "系统建设总体服务方案",
+      "criterion_name": "系统安全设计",
+      "score_text": "5分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0159",
+        "BF-0163",
+        "BF-0160",
+        "BF-0161",
+        "BF-0162",
+        "BF-0164",
+        "BF-0165",
+        "BF-0166",
+        "BF-0167",
+        "BF-0168"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 10,
+            "char_count": 2258,
+            "paragraph_count": 16,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0159",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "安全设计总体目标与依据",
+                "安全设计总体目标"
+              ],
+              "depth": 4,
+              "leaf_heading": "安全设计总体目标"
+            },
+            {
+              "fragment_id": "BF-0163",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "网络安全设计",
+                "入侵检测与防御设计"
+              ],
+              "depth": 4,
+              "leaf_heading": "入侵检测与防御设计"
+            },
+            {
+              "fragment_id": "BF-0160",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "安全设计总体目标与依据",
+                "安全设计依据"
+              ],
+              "depth": 4,
+              "leaf_heading": "安全设计依据"
+            },
+            {
+              "fragment_id": "BF-0161",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "网络安全设计",
+                "网络边界安全防护"
+              ],
+              "depth": 4,
+              "leaf_heading": "网络边界安全防护"
+            },
+            {
+              "fragment_id": "BF-0162",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "网络安全设计",
+                "网络访问控制设计"
+              ],
+              "depth": 4,
+              "leaf_heading": "网络访问控制设计"
+            },
+            {
+              "fragment_id": "BF-0164",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "主机安全设计",
+                "操作系统安全加固"
+              ],
+              "depth": 4,
+              "leaf_heading": "操作系统安全加固"
+            },
+            {
+              "fragment_id": "BF-0165",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "主机安全设计",
+                "数据库安全加固"
+              ],
+              "depth": 4,
+              "leaf_heading": "数据库安全加固"
+            },
+            {
+              "fragment_id": "BF-0166",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "主机安全设计",
+                "恶意代码防护设计"
+              ],
+              "depth": 4,
+              "leaf_heading": "恶意代码防护设计"
+            },
+            {
+              "fragment_id": "BF-0167",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "应用安全设计",
+                "身份认证与访问控制"
+              ],
+              "depth": 4,
+              "leaf_heading": "身份认证与访问控制"
+            },
+            {
+              "fragment_id": "BF-0168",
+              "heading_path": [
+                "系统建设总体服务方案",
+                "系统安全设计",
+                "应用安全设计",
+                "会话安全管理"
+              ],
+              "depth": 4,
+              "leaf_heading": "会话安全管理"
+            }
+          ],
+          "coverage_terms_found": [
+            "系统安全设计"
+          ],
+          "project_specific_terms": [
+            "闵行区"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "培训与服务保障",
+            "风险、安全或质量控制"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-005-01",
+      "score_unit_id": "TU-DRAFT-005",
+      "score_unit_name": "实施方案",
+      "criterion_name": "实施工作计划",
+      "score_text": "4分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0190",
+        "BF-0191",
+        "BF-0192",
+        "BF-0193",
+        "BF-0194",
+        "BF-0195",
+        "BF-0196",
+        "BF-0197",
+        "BF-0198",
+        "BF-0199"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 10,
+            "char_count": 4360,
+            "paragraph_count": 45,
+            "table_count": 2,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0190",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排"
+              ],
+              "depth": 2,
+              "leaf_heading": "实施工作计划、工作流程与时间安排"
+            },
+            {
+              "fragment_id": "BF-0191",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）"
+              ],
+              "depth": 3,
+              "leaf_heading": "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）"
+            },
+            {
+              "fragment_id": "BF-0192",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）",
+                "详细工作流程"
+              ],
+              "depth": 4,
+              "leaf_heading": "详细工作流程"
+            },
+            {
+              "fragment_id": "BF-0193",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）",
+                "本阶段时间安排明细"
+              ],
+              "depth": 4,
+              "leaf_heading": "本阶段时间安排明细"
+            },
+            {
+              "fragment_id": "BF-0194",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）",
+                "本阶段里程碑节点"
+              ],
+              "depth": 4,
+              "leaf_heading": "本阶段里程碑节点"
+            },
+            {
+              "fragment_id": "BF-0195",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）"
+              ],
+              "depth": 3,
+              "leaf_heading": "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）"
+            },
+            {
+              "fragment_id": "BF-0196",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）",
+                "详细工作流程"
+              ],
+              "depth": 4,
+              "leaf_heading": "详细工作流程"
+            },
+            {
+              "fragment_id": "BF-0197",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）",
+                "本阶段时间安排明细"
+              ],
+              "depth": 4,
+              "leaf_heading": "本阶段时间安排明细"
+            },
+            {
+              "fragment_id": "BF-0198",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）",
+                "本阶段里程碑节点"
+              ],
+              "depth": 4,
+              "leaf_heading": "本阶段里程碑节点"
+            },
+            {
+              "fragment_id": "BF-0199",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段三：核心系统开发与模块实现阶段（第3-4个月，第9-16周，共8周）"
+              ],
+              "depth": 3,
+              "leaf_heading": "阶段三：核心系统开发与模块实现阶段（第3-4个月，第9-16周，共8周）"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "生活垃圾",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "产生单位",
+            "环卫",
+            "政务云",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词",
+            "使用表格承载清单、配置、计划或对照关系"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": true,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-005-02",
+      "score_unit_id": "TU-DRAFT-005",
+      "score_unit_name": "实施方案",
+      "criterion_name": "工作流程、时间安排等",
+      "score_text": "4分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0196",
+        "BF-0200",
+        "BF-0204",
+        "BF-0190",
+        "BF-0191",
+        "BF-0192",
+        "BF-0193",
+        "BF-0194",
+        "BF-0195",
+        "BF-0197",
+        "BF-0198",
+        "BF-0199"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 12,
+            "char_count": 7190,
+            "paragraph_count": 89,
+            "table_count": 2,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0196",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）",
+                "详细工作流程"
+              ],
+              "depth": 4,
+              "leaf_heading": "详细工作流程"
+            },
+            {
+              "fragment_id": "BF-0200",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段三：核心系统开发与模块实现阶段（第3-4个月，第9-16周，共8周）",
+                "详细工作流程"
+              ],
+              "depth": 4,
+              "leaf_heading": "详细工作流程"
+            },
+            {
+              "fragment_id": "BF-0204",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段四：系统集成与联调测试阶段（第5个月，第17-20周，共4周）",
+                "详细工作流程"
+              ],
+              "depth": 4,
+              "leaf_heading": "详细工作流程"
+            },
+            {
+              "fragment_id": "BF-0190",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排"
+              ],
+              "depth": 2,
+              "leaf_heading": "实施工作计划、工作流程与时间安排"
+            },
+            {
+              "fragment_id": "BF-0191",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）"
+              ],
+              "depth": 3,
+              "leaf_heading": "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）"
+            },
+            {
+              "fragment_id": "BF-0192",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）",
+                "详细工作流程"
+              ],
+              "depth": 4,
+              "leaf_heading": "详细工作流程"
+            },
+            {
+              "fragment_id": "BF-0193",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）",
+                "本阶段时间安排明细"
+              ],
+              "depth": 4,
+              "leaf_heading": "本阶段时间安排明细"
+            },
+            {
+              "fragment_id": "BF-0194",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段一：项目启动与需求深化调研阶段（第1个月，第1-4周）",
+                "本阶段里程碑节点"
+              ],
+              "depth": 4,
+              "leaf_heading": "本阶段里程碑节点"
+            },
+            {
+              "fragment_id": "BF-0195",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）"
+              ],
+              "depth": 3,
+              "leaf_heading": "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）"
+            },
+            {
+              "fragment_id": "BF-0197",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）",
+                "本阶段时间安排明细"
+              ],
+              "depth": 4,
+              "leaf_heading": "本阶段时间安排明细"
+            },
+            {
+              "fragment_id": "BF-0198",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段二：系统架构设计与详细方案设计阶段（第2个月，第5-8周）",
+                "本阶段里程碑节点"
+              ],
+              "depth": 4,
+              "leaf_heading": "本阶段里程碑节点"
+            },
+            {
+              "fragment_id": "BF-0199",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段三：核心系统开发与模块实现阶段（第3-4个月，第9-16周，共8周）"
+              ],
+              "depth": 3,
+              "leaf_heading": "阶段三：核心系统开发与模块实现阶段（第3-4个月，第9-16周，共8周）"
+            }
+          ],
+          "coverage_terms_found": [
+            "工作流程",
+            "时间安排"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "生活垃圾",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "产生单位",
+            "环卫",
+            "政务云",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词",
+            "使用表格承载清单、配置、计划或对照关系"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": true,
+            "uses_image": false,
+            "list_marker_count": 1,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-005-03",
+      "score_unit_id": "TU-DRAFT-005",
+      "score_unit_name": "实施方案",
+      "criterion_name": "平台测试（含试运行）等重要环节的方案措施等",
+      "score_text": "4分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0208",
+        "BF-0204",
+        "BF-0209",
+        "BF-0210",
+        "BF-0211",
+        "BF-0212",
+        "BF-0213",
+        "BF-0214",
+        "BF-0215",
+        "BF-0216",
+        "BF-0217",
+        "BF-0218"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 12,
+            "char_count": 6012,
+            "paragraph_count": 120,
+            "table_count": 1,
+            "image_count": 0,
+            "max_heading_depth": 5
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0208",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段六：项目验收与交付阶段（第24周末，验收准备与实施）"
+              ],
+              "depth": 3,
+              "leaf_heading": "阶段六：项目验收与交付阶段（第24周末，验收准备与实施）"
+            },
+            {
+              "fragment_id": "BF-0204",
+              "heading_path": [
+                "实施方案",
+                "实施工作计划、工作流程与时间安排",
+                "阶段四：系统集成与联调测试阶段（第5个月，第17-20周，共4周）",
+                "详细工作流程"
+              ],
+              "depth": 4,
+              "leaf_heading": "详细工作流程"
+            },
+            {
+              "fragment_id": "BF-0209",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试总体目标"
+              ],
+              "depth": 4,
+              "leaf_heading": "测试总体目标"
+            },
+            {
+              "fragment_id": "BF-0210",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试原则"
+              ],
+              "depth": 4,
+              "leaf_heading": "测试原则"
+            },
+            {
+              "fragment_id": "BF-0211",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试组织与环境"
+              ],
+              "depth": 4,
+              "leaf_heading": "测试组织与环境"
+            },
+            {
+              "fragment_id": "BF-0212",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试阶段与核心内容"
+              ],
+              "depth": 4,
+              "leaf_heading": "测试阶段与核心内容"
+            },
+            {
+              "fragment_id": "BF-0213",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试阶段与核心内容",
+                "阶段1：单元测试（开发阶段同步执行，第9-16周）"
+              ],
+              "depth": 5,
+              "leaf_heading": "阶段1：单元测试（开发阶段同步执行，第9-16周）"
+            },
+            {
+              "fragment_id": "BF-0214",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试阶段与核心内容",
+                "阶段2：集成测试（第17周）"
+              ],
+              "depth": 5,
+              "leaf_heading": "阶段2：集成测试（第17周）"
+            },
+            {
+              "fragment_id": "BF-0215",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试阶段与核心内容",
+                "阶段3：系统功能测试（第18周）"
+              ],
+              "depth": 5,
+              "leaf_heading": "阶段3：系统功能测试（第18周）"
+            },
+            {
+              "fragment_id": "BF-0216",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试阶段与核心内容",
+                "阶段4：专项测试（第18-19周）"
+              ],
+              "depth": 5,
+              "leaf_heading": "阶段4：专项测试（第18-19周）"
+            },
+            {
+              "fragment_id": "BF-0217",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试阶段与核心内容",
+                "阶段5：用户验收测试（UAT）（第19周）"
+              ],
+              "depth": 5,
+              "leaf_heading": "阶段5：用户验收测试（UAT）（第19周）"
+            },
+            {
+              "fragment_id": "BF-0218",
+              "heading_path": [
+                "实施方案",
+                "平台测试与试运行方案",
+                "平台测试方案",
+                "测试阶段与核心内容",
+                "阶段6：回归测试（全测试阶段持续执行）"
+              ],
+              "depth": 5,
+              "leaf_heading": "阶段6：回归测试（全测试阶段持续执行）"
+            }
+          ],
+          "coverage_terms_found": [
+            "平台测试",
+            "方案措施"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "产生单位",
+            "环卫",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词",
+            "使用表格承载清单、配置、计划或对照关系"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "人员配置",
+            "交付物",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": true,
+            "uses_image": false,
+            "list_marker_count": 2,
+            "max_heading_depth": 5
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-01",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "生活垃圾分类智慧收运系统-智慧收运PC端",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0294",
+        "BF-0295",
+        "BF-0296",
+        "BF-0297",
+        "BF-0298",
+        "BF-0299",
+        "BF-0300",
+        "BF-0301",
+        "BF-0302",
+        "BF-0303"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 10,
+            "char_count": 5286,
+            "paragraph_count": 85,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 5
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0294",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "模块开发目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "模块开发目标"
+            },
+            {
+              "fragment_id": "BF-0295",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "基础数据管理子模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "基础数据管理子模块"
+            },
+            {
+              "fragment_id": "BF-0296",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "基础数据管理子模块",
+                "收运点位管理"
+              ],
+              "depth": 5,
+              "leaf_heading": "收运点位管理"
+            },
+            {
+              "fragment_id": "BF-0297",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "基础数据管理子模块",
+                "收运合同管理"
+              ],
+              "depth": 5,
+              "leaf_heading": "收运合同管理"
+            },
+            {
+              "fragment_id": "BF-0298",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "基础数据管理子模块",
+                "收运企业管理"
+              ],
+              "depth": 5,
+              "leaf_heading": "收运企业管理"
+            },
+            {
+              "fragment_id": "BF-0299",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "基础数据管理子模块",
+                "收运司机管理"
+              ],
+              "depth": 5,
+              "leaf_heading": "收运司机管理"
+            },
+            {
+              "fragment_id": "BF-0300",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "基础数据管理子模块",
+                "客户管理"
+              ],
+              "depth": 5,
+              "leaf_heading": "客户管理"
+            },
+            {
+              "fragment_id": "BF-0301",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "基础数据管理子模块",
+                "系统参数配置"
+              ],
+              "depth": 5,
+              "leaf_heading": "系统参数配置"
+            },
+            {
+              "fragment_id": "BF-0302",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "产生单位管理子模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "产生单位管理子模块"
+            },
+            {
+              "fragment_id": "BF-0303",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运PC端开发方案及功能内容",
+                "详细功能开发内容",
+                "产生单位管理子模块",
+                "收运合同管理"
+              ],
+              "depth": 5,
+              "leaf_heading": "收运合同管理"
+            }
+          ],
+          "coverage_terms_found": [
+            "智慧收运PC端"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "生活垃圾",
+            "智慧收运",
+            "街镇",
+            "产生单位",
+            "环卫",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "人员配置",
+            "交付物",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 5
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-02",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "生活垃圾分类智慧收运系统-智慧收运移动端",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0314",
+        "BF-0315",
+        "BF-0316"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 3,
+            "char_count": 2391,
+            "paragraph_count": 23,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0314",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运移动端开发方案及功能内容",
+                "模块开发目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "模块开发目标"
+            },
+            {
+              "fragment_id": "BF-0315",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运移动端开发方案及功能内容",
+                "详细功能开发内容",
+                "产生单位端功能模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "产生单位端功能模块"
+            },
+            {
+              "fragment_id": "BF-0316",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-智慧收运移动端开发方案及功能内容",
+                "详细功能开发内容",
+                "收运单位端功能模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "收运单位端功能模块"
+            }
+          ],
+          "coverage_terms_found": [
+            "智慧收运移动端"
+          ],
+          "project_specific_terms": [
+            "生活垃圾",
+            "智慧收运",
+            "产生单位",
+            "清运"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "功能模块说明",
+            "实施步骤与计划",
+            "培训与服务保障",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "人员配置",
+            "验收闭环",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-03",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "生活垃圾分类智慧收运系统-街镇智慧收运监管场景",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0317",
+        "BF-0318",
+        "BF-0319",
+        "BF-0320",
+        "BF-0321"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 5,
+            "char_count": 2171,
+            "paragraph_count": 29,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0317",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-街镇智慧收运监管场景开发方案及功能内容",
+                "模块开发目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "模块开发目标"
+            },
+            {
+              "fragment_id": "BF-0318",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-街镇智慧收运监管场景开发方案及功能内容",
+                "详细功能开发内容",
+                "收运合同监管模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "收运合同监管模块"
+            },
+            {
+              "fragment_id": "BF-0319",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-街镇智慧收运监管场景开发方案及功能内容",
+                "详细功能开发内容",
+                "分类收运量监管模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "分类收运量监管模块"
+            },
+            {
+              "fragment_id": "BF-0320",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-街镇智慧收运监管场景开发方案及功能内容",
+                "详细功能开发内容",
+                "收运状态监管模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "收运状态监管模块"
+            },
+            {
+              "fragment_id": "BF-0321",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "生活垃圾分类智慧收运系统-街镇智慧收运监管场景开发方案及功能内容",
+                "详细功能开发内容",
+                "订单信息与问题处置模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "订单信息与问题处置模块"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "产生单位",
+            "清运"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "验收闭环",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-04",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "环境卫生监管系统",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0322",
+        "BF-0323",
+        "BF-0324",
+        "BF-0325"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 4,
+            "char_count": 2046,
+            "paragraph_count": 20,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0322",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "环境卫生监管系统开发方案及功能内容",
+                "模块开发目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "模块开发目标"
+            },
+            {
+              "fragment_id": "BF-0323",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "环境卫生监管系统开发方案及功能内容",
+                "详细功能开发内容",
+                "生活垃圾管理-智慧收运路线监管模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "生活垃圾管理-智慧收运路线监管模块"
+            },
+            {
+              "fragment_id": "BF-0324",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "环境卫生监管系统开发方案及功能内容",
+                "详细功能开发内容",
+                "生活垃圾管理-中转运输监管模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "生活垃圾管理-中转运输监管模块"
+            },
+            {
+              "fragment_id": "BF-0325",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "环境卫生监管系统开发方案及功能内容",
+                "详细功能开发内容",
+                "生活垃圾管理-案件管理模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "生活垃圾管理-案件管理模块"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "街镇",
+            "环卫",
+            "清运"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "培训安排",
+            "验收闭环",
+            "风险控制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-05",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "综合考核评价系统",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0326",
+        "BF-0327",
+        "BF-0328",
+        "BF-0329"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 4,
+            "char_count": 1980,
+            "paragraph_count": 22,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0326",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "综合考核评价系统开发方案及功能内容",
+                "模块开发目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "模块开发目标"
+            },
+            {
+              "fragment_id": "BF-0327",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "综合考核评价系统开发方案及功能内容",
+                "详细功能开发内容",
+                "智慧收运路线考评指标体系管理模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "智慧收运路线考评指标体系管理模块"
+            },
+            {
+              "fragment_id": "BF-0328",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "综合考核评价系统开发方案及功能内容",
+                "详细功能开发内容",
+                "智慧收运路线综合评分模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "智慧收运路线综合评分模块"
+            },
+            {
+              "fragment_id": "BF-0329",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "综合考核评价系统开发方案及功能内容",
+                "详细功能开发内容",
+                "智慧收运路线街镇考核模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "智慧收运路线街镇考核模块"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "闵行区",
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "街镇",
+            "环卫"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "培训安排",
+            "验收闭环"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-06",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "综合资料库管理系统",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [],
+      "mapping_status": "no_linked_fragment",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 0,
+            "char_count": 0,
+            "paragraph_count": 0,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 0
+          },
+          "heading_patterns": [],
+          "coverage_terms_found": [],
+          "project_specific_terms": [],
+          "content_modules": [],
+          "writing_structure": [
+            "围绕评分细则标题展开说明"
+          ],
+          "execution_elements": [],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 0
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-07",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "可视化指挥软件",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0330",
+        "BF-0331",
+        "BF-0332",
+        "BF-0333"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 4,
+            "char_count": 2262,
+            "paragraph_count": 20,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0330",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "可视化指挥软件开发方案及功能内容",
+                "模块开发目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "模块开发目标"
+            },
+            {
+              "fragment_id": "BF-0331",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "可视化指挥软件开发方案及功能内容",
+                "详细功能开发内容",
+                "可视化大屏总体设计"
+              ],
+              "depth": 4,
+              "leaf_heading": "可视化大屏总体设计"
+            },
+            {
+              "fragment_id": "BF-0332",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "可视化指挥软件开发方案及功能内容",
+                "详细功能开发内容",
+                "生活垃圾分类专题可视化展示模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "生活垃圾分类专题可视化展示模块"
+            },
+            {
+              "fragment_id": "BF-0333",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "可视化指挥软件开发方案及功能内容",
+                "详细功能开发内容",
+                "应急指挥调度功能模块"
+              ],
+              "depth": 4,
+              "leaf_heading": "应急指挥调度功能模块"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "闵行区",
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "街镇",
+            "环卫",
+            "清运"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "阶段计划",
+            "人员配置",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-08",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "数据接口开发",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0334",
+        "BF-0335",
+        "BF-0336",
+        "BF-0337",
+        "BF-0338"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 5,
+            "char_count": 2339,
+            "paragraph_count": 26,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0334",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "数据接口开发方案及功能内容",
+                "模块开发目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "模块开发目标"
+            },
+            {
+              "fragment_id": "BF-0335",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "数据接口开发方案及功能内容",
+                "详细开发内容",
+                "接口开发总体设计"
+              ],
+              "depth": 4,
+              "leaf_heading": "接口开发总体设计"
+            },
+            {
+              "fragment_id": "BF-0336",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "数据接口开发方案及功能内容",
+                "详细开发内容",
+                "车载物联数据共享接口开发"
+              ],
+              "depth": 4,
+              "leaf_heading": "车载物联数据共享接口开发"
+            },
+            {
+              "fragment_id": "BF-0337",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "数据接口开发方案及功能内容",
+                "详细开发内容",
+                "智慧收运数据接收接口开发"
+              ],
+              "depth": 4,
+              "leaf_heading": "智慧收运数据接收接口开发"
+            },
+            {
+              "fragment_id": "BF-0338",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "数据接口开发方案及功能内容",
+                "详细开发内容",
+                "配套接口开发内容"
+              ],
+              "depth": 4,
+              "leaf_heading": "配套接口开发内容"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "产生单位",
+            "环卫",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "正文使用编号条目承载多个检查点",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "阶段计划",
+            "人员配置",
+            "培训安排",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 8,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-006-09",
+      "score_unit_id": "TU-DRAFT-006",
+      "score_unit_name": "软件模块开发方案及软件功能内容",
+      "criterion_name": "密码应用建设",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0339",
+        "BF-0340",
+        "BF-0341",
+        "BF-0342"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 4,
+            "char_count": 3032,
+            "paragraph_count": 22,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0339",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "密码应用建设开发方案及功能内容",
+                "模块开发目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "模块开发目标"
+            },
+            {
+              "fragment_id": "BF-0340",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "密码应用建设开发方案及功能内容",
+                "详细开发内容",
+                "密码应用总体设计"
+              ],
+              "depth": 4,
+              "leaf_heading": "密码应用总体设计"
+            },
+            {
+              "fragment_id": "BF-0341",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "密码应用建设开发方案及功能内容",
+                "详细开发内容",
+                "核心密码应用功能开发"
+              ],
+              "depth": 4,
+              "leaf_heading": "核心密码应用功能开发"
+            },
+            {
+              "fragment_id": "BF-0342",
+              "heading_path": [
+                "软件模块开发方案及软件功能内容",
+                "密码应用建设开发方案及功能内容",
+                "详细开发内容",
+                "密码应用安全保障与合规性设计"
+              ],
+              "depth": 4,
+              "leaf_heading": "密码应用安全保障与合规性设计"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "街镇",
+            "产生单位"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "人员配置",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-007-01",
+      "score_unit_id": "TU-DRAFT-007",
+      "score_unit_name": "服务综合支撑能力",
+      "criterion_name": "本地化服务团队配置及服务能力",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0343",
+        "BF-0344",
+        "BF-0345",
+        "BF-0346"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 4,
+            "char_count": 19,
+            "paragraph_count": 1,
+            "table_count": 0,
+            "image_count": 11,
+            "max_heading_depth": 3
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0343",
+              "heading_path": [
+                "服务综合支撑能力",
+                "本地化服务团队配置及服务能力",
+                "办公场所证明"
+              ],
+              "depth": 3,
+              "leaf_heading": "办公场所证明"
+            },
+            {
+              "fragment_id": "BF-0344",
+              "heading_path": [
+                "服务综合支撑能力",
+                "本地化服务团队配置及服务能力",
+                "本地缴纳社保人员名单"
+              ],
+              "depth": 3,
+              "leaf_heading": "本地缴纳社保人员名单"
+            },
+            {
+              "fragment_id": "BF-0345",
+              "heading_path": [
+                "服务综合支撑能力",
+                "本地化服务团队配置及服务能力",
+                "本地团队的组织架构图"
+              ],
+              "depth": 3,
+              "leaf_heading": "本地团队的组织架构图"
+            },
+            {
+              "fragment_id": "BF-0346",
+              "heading_path": [
+                "服务综合支撑能力",
+                "本地化服务团队配置及服务能力",
+                "团队的能力"
+              ],
+              "depth": 3,
+              "leaf_heading": "团队的能力"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [],
+          "content_modules": [],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "使用图片或图示承载架构、流程或关系"
+          ],
+          "execution_elements": [],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": true,
+            "list_marker_count": 0,
+            "max_heading_depth": 3
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-007-02",
+      "score_unit_id": "TU-DRAFT-007",
+      "score_unit_name": "服务综合支撑能力",
+      "criterion_name": "可提供与本项目相关的资源情况",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0347"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 1,
+            "char_count": 545,
+            "paragraph_count": 1,
+            "table_count": 1,
+            "image_count": 0,
+            "max_heading_depth": 2
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0347",
+              "heading_path": [
+                "服务综合支撑能力",
+                "与本项目相关的资源情况"
+              ],
+              "depth": 2,
+              "leaf_heading": "与本项目相关的资源情况"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "环卫",
+            "清运"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "业务场景拆解",
+            "功能模块说明",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词",
+            "使用表格承载清单、配置、计划或对照关系"
+          ],
+          "execution_elements": [
+            "测试验证",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": true,
+            "uses_image": false,
+            "list_marker_count": 2,
+            "max_heading_depth": 2
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-007-03",
+      "score_unit_id": "TU-DRAFT-007",
+      "score_unit_name": "服务综合支撑能力",
+      "criterion_name": "服务响应时间、修复时间、应急预案等",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0348",
+        "BF-0349",
+        "BF-0351",
+        "BF-0350",
+        "BF-0352",
+        "BF-0353",
+        "BF-0354",
+        "BF-0355",
+        "BF-0356"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 9,
+            "char_count": 2384,
+            "paragraph_count": 65,
+            "table_count": 0,
+            "image_count": 1,
+            "max_heading_depth": 5
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0348",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "服务承诺书"
+              ],
+              "depth": 3,
+              "leaf_heading": "服务承诺书"
+            },
+            {
+              "fragment_id": "BF-0349",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "应急预案"
+              ],
+              "depth": 3,
+              "leaf_heading": "应急预案"
+            },
+            {
+              "fragment_id": "BF-0351",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "应急预案",
+                "应急处理流程图",
+                "应急处理步骤"
+              ],
+              "depth": 5,
+              "leaf_heading": "应急处理步骤"
+            },
+            {
+              "fragment_id": "BF-0350",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "应急预案",
+                "应急处理流程图"
+              ],
+              "depth": 4,
+              "leaf_heading": "应急处理流程图"
+            },
+            {
+              "fragment_id": "BF-0352",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "应急预案",
+                "场景演练"
+              ],
+              "depth": 4,
+              "leaf_heading": "场景演练"
+            },
+            {
+              "fragment_id": "BF-0353",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "应急预案",
+                "场景演练",
+                "停电场景演练记录"
+              ],
+              "depth": 5,
+              "leaf_heading": "停电场景演练记录"
+            },
+            {
+              "fragment_id": "BF-0354",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "应急预案",
+                "场景演练",
+                "断网场景演练记录"
+              ],
+              "depth": 5,
+              "leaf_heading": "断网场景演练记录"
+            },
+            {
+              "fragment_id": "BF-0355",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "应急预案",
+                "场景演练",
+                "设备瘫痪场景演练记录"
+              ],
+              "depth": 5,
+              "leaf_heading": "设备瘫痪场景演练记录"
+            },
+            {
+              "fragment_id": "BF-0356",
+              "heading_path": [
+                "服务综合支撑能力",
+                "服务响应时间、修复时间、应急预案等",
+                "应急预案",
+                "备用方案",
+                "备用人员梯队名单"
+              ],
+              "depth": 5,
+              "leaf_heading": "备用人员梯队名单"
+            }
+          ],
+          "coverage_terms_found": [
+            "修复时间",
+            "应急预案"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "环卫",
+            "大数据中心"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "正文使用编号条目承载多个检查点",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词",
+            "使用图片或图示承载架构、流程或关系"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": true,
+            "list_marker_count": 10,
+            "max_heading_depth": 5
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-007-04",
+      "score_unit_id": "TU-DRAFT-007",
+      "score_unit_name": "服务综合支撑能力",
+      "criterion_name": "售后服务人员配备及管理措施",
+      "score_text": "2分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0357",
+        "BF-0358",
+        "BF-0359",
+        "BF-0360",
+        "BF-0361"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 5,
+            "char_count": 1444,
+            "paragraph_count": 22,
+            "table_count": 2,
+            "image_count": 0,
+            "max_heading_depth": 5
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0357",
+              "heading_path": [
+                "服务综合支撑能力",
+                "售后服务人员配备及管理措施",
+                "售后服务人员配备",
+                "核心售后人员配置及资质简历"
+              ],
+              "depth": 4,
+              "leaf_heading": "核心售后人员配置及资质简历"
+            },
+            {
+              "fragment_id": "BF-0358",
+              "heading_path": [
+                "服务综合支撑能力",
+                "售后服务人员配备及管理措施",
+                "售后服务人员配备",
+                "AB角备份机制"
+              ],
+              "depth": 4,
+              "leaf_heading": "AB角备份机制"
+            },
+            {
+              "fragment_id": "BF-0359",
+              "heading_path": [
+                "服务综合支撑能力",
+                "售后服务人员配备及管理措施",
+                "售后服务人员管理措施",
+                "保密协议管理"
+              ],
+              "depth": 4,
+              "leaf_heading": "保密协议管理"
+            },
+            {
+              "fragment_id": "BF-0360",
+              "heading_path": [
+                "服务综合支撑能力",
+                "售后服务人员配备及管理措施",
+                "售后服务人员管理措施",
+                "安全生产责任书管理"
+              ],
+              "depth": 4,
+              "leaf_heading": "安全生产责任书管理"
+            },
+            {
+              "fragment_id": "BF-0361",
+              "heading_path": [
+                "服务综合支撑能力",
+                "售后服务人员配备及管理措施",
+                "售后服务人员管理措施",
+                "售后服务管理文件",
+                "《培训记录表》"
+              ],
+              "depth": 5,
+              "leaf_heading": "《培训记录表》"
+            }
+          ],
+          "coverage_terms_found": [],
+          "project_specific_terms": [
+            "闵行区",
+            "环卫",
+            "大数据中心"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词",
+            "使用表格承载清单、配置、计划或对照关系"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "责任分工",
+            "人员配置",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": true,
+            "uses_image": false,
+            "list_marker_count": 2,
+            "max_heading_depth": 5
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-008-01",
+      "score_unit_id": "TU-DRAFT-008",
+      "score_unit_name": "项目服务团队配备情况",
+      "criterion_name": "项目负责人、技术负责人",
+      "score_text": "4分",
+      "scoring_type": "objective",
+      "linked_fragment_ids": [
+        "BF-0188",
+        "BF-0475",
+        "BF-0374",
+        "BF-0023",
+        "BF-0033",
+        "BF-0362"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": null,
+      "objective_evidence_features": {
+        "feature_source": "rule_extraction",
+        "evidence_type": "personnel_count",
+        "verification_mode": "数量门槛型",
+        "required_evidence_terms_from_criterion": [
+          "证书",
+          "人数",
+          "不少于",
+          "项目负责人",
+          "技术负责人",
+          "职称",
+          "信息系统项目管理师",
+          "系统集成项目管理师",
+          "高级工程师"
+        ],
+        "candidate_evidence_fields": [
+          "人员数量",
+          "岗位角色",
+          "人员清单"
+        ],
+        "detected_evidence_terms_in_linked_fragments": [
+          "证书",
+          "人数",
+          "不少于",
+          "项目负责人",
+          "技术负责人",
+          "职称",
+          "信息系统项目管理师",
+          "高级工程师"
+        ],
+        "linked_fragment_stats": {
+          "fragment_count": 6,
+          "char_count": 4208,
+          "paragraph_count": 39,
+          "table_count": 2,
+          "image_count": 2,
+          "max_heading_depth": 4
+        },
+        "note": "本结构只描述客观项的证据核验字段，不做得分计算。"
+      },
+      "model_status": "not_applicable"
+    },
+    {
+      "criterion_id": "PC-008-02",
+      "score_unit_id": "TU-DRAFT-008",
+      "score_unit_name": "项目服务团队配备情况",
+      "criterion_name": "团队配备人数",
+      "score_text": "1分",
+      "scoring_type": "objective",
+      "linked_fragment_ids": [],
+      "mapping_status": "no_linked_fragment",
+      "subjective_writing_features": null,
+      "objective_evidence_features": {
+        "feature_source": "rule_extraction",
+        "evidence_type": "personnel_count",
+        "verification_mode": "数量门槛型",
+        "required_evidence_terms_from_criterion": [
+          "证书",
+          "人数",
+          "不少于",
+          "项目负责人",
+          "技术负责人",
+          "职称",
+          "信息系统项目管理师",
+          "系统集成项目管理师",
+          "高级工程师"
+        ],
+        "candidate_evidence_fields": [
+          "人员数量",
+          "岗位角色",
+          "人员清单"
+        ],
+        "detected_evidence_terms_in_linked_fragments": [],
+        "linked_fragment_stats": {
+          "fragment_count": 0,
+          "char_count": 0,
+          "paragraph_count": 0,
+          "table_count": 0,
+          "image_count": 0,
+          "max_heading_depth": 0
+        },
+        "note": "本结构只描述客观项的证据核验字段，不做得分计算。"
+      },
+      "model_status": "not_applicable"
+    },
+    {
+      "criterion_id": "PC-008-03",
+      "score_unit_id": "TU-DRAFT-008",
+      "score_unit_name": "项目服务团队配备情况",
+      "criterion_name": "主要技术人员配备",
+      "score_text": "2分",
+      "scoring_type": "objective",
+      "linked_fragment_ids": [
+        "BF-0188",
+        "BF-0475",
+        "BF-0374",
+        "BF-0395"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": null,
+      "objective_evidence_features": {
+        "feature_source": "rule_extraction",
+        "evidence_type": "personnel_count",
+        "verification_mode": "数量门槛型",
+        "required_evidence_terms_from_criterion": [
+          "证书",
+          "人数",
+          "不少于",
+          "项目负责人",
+          "技术负责人",
+          "职称",
+          "信息系统项目管理师",
+          "系统集成项目管理师",
+          "高级工程师"
+        ],
+        "candidate_evidence_fields": [
+          "人员数量",
+          "岗位角色",
+          "人员清单"
+        ],
+        "detected_evidence_terms_in_linked_fragments": [
+          "证书",
+          "人数",
+          "不少于",
+          "项目负责人",
+          "技术负责人",
+          "职称",
+          "信息系统项目管理师",
+          "高级工程师"
+        ],
+        "linked_fragment_stats": {
+          "fragment_count": 4,
+          "char_count": 3187,
+          "paragraph_count": 27,
+          "table_count": 1,
+          "image_count": 0,
+          "max_heading_depth": 4
+        },
+        "note": "本结构只描述客观项的证据核验字段，不做得分计算。"
+      },
+      "model_status": "not_applicable"
+    },
+    {
+      "criterion_id": "PC-009-01",
+      "score_unit_id": "TU-DRAFT-009",
+      "score_unit_name": "系统调试及验收方案",
+      "criterion_name": "系统调试及验收方案",
+      "score_text": "5分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0364",
+        "BF-0365",
+        "BF-0366",
+        "BF-0367",
+        "BF-0368",
+        "BF-0369",
+        "BF-0370",
+        "BF-0371",
+        "BF-0372",
+        "BF-0373"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 10,
+            "char_count": 2137,
+            "paragraph_count": 46,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0364",
+              "heading_path": [
+                "系统调试及验收方案",
+                "方案总则",
+                "编制目的"
+              ],
+              "depth": 3,
+              "leaf_heading": "编制目的"
+            },
+            {
+              "fragment_id": "BF-0365",
+              "heading_path": [
+                "系统调试及验收方案",
+                "方案总则",
+                "适用范围"
+              ],
+              "depth": 3,
+              "leaf_heading": "适用范围"
+            },
+            {
+              "fragment_id": "BF-0366",
+              "heading_path": [
+                "系统调试及验收方案",
+                "方案总则",
+                "核心原则"
+              ],
+              "depth": 3,
+              "leaf_heading": "核心原则"
+            },
+            {
+              "fragment_id": "BF-0367",
+              "heading_path": [
+                "系统调试及验收方案",
+                "方案总则",
+                "方案编制依据"
+              ],
+              "depth": 3,
+              "leaf_heading": "方案编制依据"
+            },
+            {
+              "fragment_id": "BF-0368",
+              "heading_path": [
+                "系统调试及验收方案",
+                "方案总则",
+                "方案编制依据",
+                "国家及地方法律法规"
+              ],
+              "depth": 4,
+              "leaf_heading": "国家及地方法律法规"
+            },
+            {
+              "fragment_id": "BF-0369",
+              "heading_path": [
+                "系统调试及验收方案",
+                "方案总则",
+                "方案编制依据",
+                "政策文件"
+              ],
+              "depth": 4,
+              "leaf_heading": "政策文件"
+            },
+            {
+              "fragment_id": "BF-0370",
+              "heading_path": [
+                "系统调试及验收方案",
+                "方案总则",
+                "方案编制依据",
+                "国家及行业标准规范"
+              ],
+              "depth": 4,
+              "leaf_heading": "国家及行业标准规范"
+            },
+            {
+              "fragment_id": "BF-0371",
+              "heading_path": [
+                "系统调试及验收方案",
+                "方案总则",
+                "方案编制依据",
+                "项目相关文件"
+              ],
+              "depth": 4,
+              "leaf_heading": "项目相关文件"
+            },
+            {
+              "fragment_id": "BF-0372",
+              "heading_path": [
+                "系统调试及验收方案",
+                "系统调试及验收管理体系与标准",
+                "组织管理体系与职责分工"
+              ],
+              "depth": 3,
+              "leaf_heading": "组织管理体系与职责分工"
+            },
+            {
+              "fragment_id": "BF-0373",
+              "heading_path": [
+                "系统调试及验收方案",
+                "系统调试及验收管理体系与标准",
+                "组织管理体系与职责分工",
+                "项目领导小组"
+              ],
+              "depth": 4,
+              "leaf_heading": "项目领导小组"
+            }
+          ],
+          "coverage_terms_found": [
+            "系统调试"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "绿化市容",
+            "生活垃圾",
+            "垃圾分类",
+            "智慧收运",
+            "一网统管",
+            "街镇",
+            "环卫",
+            "清运",
+            "大数据中心",
+            "区城运平台"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "先给出项目定位或需求理解结论",
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "风险控制",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 1,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-010-01",
+      "score_unit_id": "TU-DRAFT-010",
+      "score_unit_name": "培训方案",
+      "criterion_name": "培训方案",
+      "score_text": "3分",
+      "scoring_type": "subjective",
+      "linked_fragment_ids": [
+        "BF-0456",
+        "BF-0465",
+        "BF-0471",
+        "BF-0459",
+        "BF-0245",
+        "BF-0246",
+        "BF-0247",
+        "BF-0248",
+        "BF-0249",
+        "BF-0250",
+        "BF-0251",
+        "BF-0252"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": {
+        "rule_features": {
+          "feature_source": "rule_extraction",
+          "text_stats": {
+            "fragment_count": 12,
+            "char_count": 2512,
+            "paragraph_count": 67,
+            "table_count": 0,
+            "image_count": 0,
+            "max_heading_depth": 4
+          },
+          "heading_patterns": [
+            {
+              "fragment_id": "BF-0456",
+              "heading_path": [
+                "培训方案",
+                "培训整体规划与总体实施计划",
+                "培训期限与场次安排"
+              ],
+              "depth": 3,
+              "leaf_heading": "培训期限与场次安排"
+            },
+            {
+              "fragment_id": "BF-0465",
+              "heading_path": [
+                "培训方案",
+                "分对象差异化专项培训方案",
+                "系统管理人员专项培训方案",
+                "培训期限与场次安排"
+              ],
+              "depth": 4,
+              "leaf_heading": "培训期限与场次安排"
+            },
+            {
+              "fragment_id": "BF-0471",
+              "heading_path": [
+                "培训方案",
+                "分对象差异化专项培训方案",
+                "业务人员专项培训方案",
+                "培训期限与场次安排"
+              ],
+              "depth": 4,
+              "leaf_heading": "培训期限与场次安排"
+            },
+            {
+              "fragment_id": "BF-0459",
+              "heading_path": [
+                "培训方案",
+                "分对象差异化专项培训方案",
+                "管理层专项培训方案",
+                "培训期限与场次安排"
+              ],
+              "depth": 4,
+              "leaf_heading": "培训期限与场次安排"
+            },
+            {
+              "fragment_id": "BF-0245",
+              "heading_path": [
+                "实施方案",
+                "项目培训方案"
+              ],
+              "depth": 2,
+              "leaf_heading": "项目培训方案"
+            },
+            {
+              "fragment_id": "BF-0246",
+              "heading_path": [
+                "实施方案",
+                "项目培训方案",
+                "培训总体目标"
+              ],
+              "depth": 3,
+              "leaf_heading": "培训总体目标"
+            },
+            {
+              "fragment_id": "BF-0247",
+              "heading_path": [
+                "实施方案",
+                "项目培训方案",
+                "培训原则"
+              ],
+              "depth": 3,
+              "leaf_heading": "培训原则"
+            },
+            {
+              "fragment_id": "BF-0248",
+              "heading_path": [
+                "实施方案",
+                "项目培训方案",
+                "培训对象与定制化培训内容"
+              ],
+              "depth": 3,
+              "leaf_heading": "培训对象与定制化培训内容"
+            },
+            {
+              "fragment_id": "BF-0249",
+              "heading_path": [
+                "实施方案",
+                "项目培训方案",
+                "培训对象与定制化培训内容",
+                "区级监管用户（区绿容局、区环卫中心、区城运中心管理人员）"
+              ],
+              "depth": 4,
+              "leaf_heading": "区级监管用户（区绿容局、区环卫中心、区城运中心管理人员）"
+            },
+            {
+              "fragment_id": "BF-0250",
+              "heading_path": [
+                "实施方案",
+                "项目培训方案",
+                "培训对象与定制化培训内容",
+                "街镇监管用户"
+              ],
+              "depth": 4,
+              "leaf_heading": "街镇监管用户"
+            },
+            {
+              "fragment_id": "BF-0251",
+              "heading_path": [
+                "实施方案",
+                "项目培训方案",
+                "培训对象与定制化培训内容",
+                "环卫作业公司管理人员"
+              ],
+              "depth": 4,
+              "leaf_heading": "环卫作业公司管理人员"
+            },
+            {
+              "fragment_id": "BF-0252",
+              "heading_path": [
+                "实施方案",
+                "项目培训方案",
+                "培训对象与定制化培训内容",
+                "一线收运作业人员（司机、收运员）"
+              ],
+              "depth": 4,
+              "leaf_heading": "一线收运作业人员（司机、收运员）"
+            }
+          ],
+          "coverage_terms_found": [
+            "培训方案"
+          ],
+          "project_specific_terms": [
+            "闵行区",
+            "生活垃圾",
+            "智慧收运",
+            "街镇",
+            "产生单位",
+            "环卫",
+            "清运"
+          ],
+          "content_modules": [
+            "项目背景与目标定位",
+            "采购需求理解",
+            "业务场景拆解",
+            "系统架构或分层设计",
+            "功能模块说明",
+            "实施步骤与计划",
+            "测试、试运行或验收",
+            "培训与服务保障",
+            "风险、安全或质量控制",
+            "人员组织与责任分工"
+          ],
+          "writing_structure": [
+            "再按架构、模块或业务对象拆解展开",
+            "用步骤、流程或阶段说明可执行路径",
+            "补充保障、风险或安全控制内容",
+            "将通用方案绑定到本项目场景和专有名词"
+          ],
+          "execution_elements": [
+            "步骤流程",
+            "阶段计划",
+            "责任分工",
+            "人员配置",
+            "交付物",
+            "测试验证",
+            "培训安排",
+            "验收闭环",
+            "保障机制"
+          ],
+          "format_elements": {
+            "uses_table": false,
+            "uses_image": false,
+            "list_marker_count": 0,
+            "max_heading_depth": 4
+          }
+        },
+        "model_features": null
+      },
+      "objective_evidence_features": null,
+      "model_status": "skipped_no_mimo"
+    },
+    {
+      "criterion_id": "PC-011-01",
+      "score_unit_id": "TU-DRAFT-011",
+      "score_unit_name": "类似项目的经验",
+      "criterion_name": "类似项目的经验",
+      "score_text": "8分",
+      "scoring_type": "objective",
+      "linked_fragment_ids": [
+        "BF-0505"
+      ],
+      "mapping_status": "linked",
+      "subjective_writing_features": null,
+      "objective_evidence_features": {
+        "feature_source": "rule_extraction",
+        "evidence_type": "contract_case",
+        "verification_mode": "证明材料计数型",
+        "required_evidence_terms_from_criterion": [
+          "合同",
+          "扫描件",
+          "每份",
+          "盖章页",
+          "签订日期",
+          "服务期限",
+          "合同扫描件"
+        ],
+        "candidate_evidence_fields": [
+          "合同名称",
+          "签订日期",
+          "服务期限",
+          "盖章页",
+          "合同扫描件"
+        ],
+        "detected_evidence_terms_in_linked_fragments": [
+          "合同",
+          "扫描件",
+          "签订日期"
+        ],
+        "linked_fragment_stats": {
+          "fragment_count": 1,
+          "char_count": 196,
+          "paragraph_count": 10,
+          "table_count": 1,
+          "image_count": 2,
+          "max_heading_depth": 2
+        },
+        "note": "本结构只描述客观项的证据核验字段，不做得分计算。"
+      },
+      "model_status": "not_applicable"
+    }
+  ]
+}

@@ -964,7 +964,6 @@ def build_rule_based_criteria(score_units: list[dict[str, Any]]) -> list[dict[st
             raw_text = normalize_text(item["raw_text"])
             if review_standard and review_standard != raw_text:
                 raw_text = normalize_text(f"{raw_text}\n二、评分标准：{review_standard}")
-            objective_hit = keyword_objective_hit(unit, criterion_name, raw_text)
             criteria.append(
                 {
                     "criterion_id": f"PC-{unit_no:03d}-{item_index:02d}",
@@ -975,15 +974,12 @@ def build_rule_based_criteria(score_units: list[dict[str, Any]]) -> list[dict[st
                     "feature": feature,
                     "evaluation_method": f"该细则最高{item['score_text']}，按采购文件评分标准判断",
                     "score_text": item["score_text"],
-                    "scoring_type": "objective" if objective_hit else "subjective",
+                    "scoring_type": infer_scoring_type(unit, criterion_name, raw_text),
                     "raw_text": raw_text,
                     "source": {
                         "score_unit_page_start": unit.get("page_start"),
                         "score_unit_page_end": unit.get("page_end"),
                         "extraction_method": "rule_split_v0",
-                        "scoring_type_source": (
-                            "keyword_objective" if objective_hit else "needs_model_review"
-                        ),
                     },
                 }
             )
@@ -1005,7 +1001,6 @@ def build_criteria_refine_messages(criteria: list[dict[str, Any]]) -> list[dict[
         }
         for item in criteria
     ]
-    objective_keywords_hint = "、".join(OBJECTIVE_KEYWORDS)
     return [
         {
             "role": "system",
@@ -1013,10 +1008,7 @@ def build_criteria_refine_messages(criteria: list[dict[str, Any]]) -> list[dict[
                 "你是采购评分细则结构补全器。只能根据输入raw_text补全或修正字段："
                 "object、feature、evaluation_method、scoring_type。"
                 "不得新增采购文件没有的评分要求，不得改criterion_id，不得改criterion_name，"
-                "不得改score_text。scoring_type只能是subjective或objective。\n"
-                f"判定scoring_type时优先参考已知客观特征关键词：{objective_keywords_hint}。"
-                "出现这些关键词或同义概念（证件资质、合同份数、人数门槛、固定公式、扫描件、社保职称等）一般为objective；"
-                "涉及理解程度、合理性、方案完整度、措施有效性、契合度等评估则为subjective。"
+                "不得改score_text。scoring_type只能是subjective或objective。"
             ),
         },
         {
@@ -1065,21 +1057,13 @@ def refine_criteria_with_mimo(criteria: list[dict[str, Any]]) -> tuple[list[dict
     for item in criteria:
         update = updates.get(item["criterion_id"], {})
         merged = dict(item)
-        for key in ("object", "feature", "evaluation_method"):
+        for key in ("object", "feature", "evaluation_method", "scoring_type"):
             value = update.get(key)
             if isinstance(value, str) and value.strip():
                 merged[key] = normalize_text(value)
-
-        merged["source"] = dict(merged.get("source", {}))
-        scoring_type_source = merged["source"].get("scoring_type_source", "")
-        if scoring_type_source == "needs_model_review":
-            value = update.get("scoring_type")
-            if isinstance(value, str) and value.strip() in {"subjective", "objective"}:
-                merged["scoring_type"] = normalize_text(value)
-                merged["source"]["scoring_type_source"] = "model_review"
-
         if merged["scoring_type"] not in {"subjective", "objective"}:
             merged["scoring_type"] = item["scoring_type"]
+        merged["source"] = dict(merged.get("source", {}))
         merged["source"]["structure_refiner"] = config["model"]
         refined.append(merged)
     return refined, "rule_split_v0_mimo_structured"
@@ -1312,7 +1296,7 @@ def split_bid_technical_docx(docx_path: Path) -> list[dict[str, Any]]:
     in_technical_part = False
 
     for block in blocks:
-        if block.heading_level and block.heading_level <= 5:
+        if block.heading_level and block.heading_level <= 5 and block.text:
             if block.text == "技术响应文件":
                 in_technical_part = True
                 continue
@@ -1327,10 +1311,10 @@ def split_bid_technical_docx(docx_path: Path) -> list[dict[str, Any]]:
             for old_level in list(heading_stack):
                 if old_level >= level:
                     heading_stack.pop(old_level, None)
-            heading_stack[level] = block.text or ""
+            heading_stack[level] = block.text
             heading_path = [heading_stack[idx] for idx in sorted(heading_stack)]
             section_index += 1
-            current = empty_section(section_index, level, block.text or "", heading_path, block.block_id)
+            current = empty_section(section_index, level, block.text, heading_path, block.block_id)
             continue
 
         if not in_technical_part or current is None:
@@ -1835,7 +1819,7 @@ def structural_rule_links(
     for fragment in fragments:
         top_direction = normalize_text(fragment.get("top_score_direction", ""))
         title_text = compact_text(" ".join(fragment.get("heading_path", [])))
-        if unit_name and top_direction != unit_name:
+        if unit_name and top_direction != unit_name and compact_text(unit_name) not in title_text:
             continue
 
         matched_terms = [
@@ -1930,13 +1914,6 @@ def map_criteria_to_bid_fragments(
         print(f"skip procurement-bid mapping: output exists {PROCUREMENT_BID_MAPPING_JSON}")
         return json.loads(PROCUREMENT_BID_MAPPING_JSON.read_text(encoding="utf-8"))
 
-    allowed_link_keys = {
-        "fragment_id",
-        "heading_path",
-        "evidence_text",
-        "match_reason",
-        "decision_source",
-    }
     mappings: list[dict[str, Any]] = []
     for index, criterion in enumerate(criteria, start=1):
         candidates = recall_candidate_fragments(criterion, fragments, limit=10)
@@ -1954,17 +1931,13 @@ def map_criteria_to_bid_fragments(
         else:
             links = structural_links
 
-        sanitized_links = [
-            {k: v for k, v in link.items() if k in allowed_link_keys}
-            for link in links
-        ]
         mappings.append(
             {
                 "criterion_id": criterion["criterion_id"],
                 "score_unit_id": criterion["score_unit_id"],
                 "score_unit_name": criterion["score_unit_name"],
                 "criterion_name": criterion["criterion_name"],
-                "linked_bid_fragments": sanitized_links,
+                "linked_bid_fragments": links,
                 "candidate_fragment_ids": [candidate["fragment"]["fragment_id"] for candidate in candidates],
             }
         )

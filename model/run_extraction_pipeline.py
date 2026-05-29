@@ -14,14 +14,17 @@ The pipeline extracts and labels data only. It does not estimate scores.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
 import zipfile
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -929,13 +932,6 @@ def infer_object_feature(criterion_name: str) -> tuple[str, str]:
     return cleaned, "响应情况"
 
 
-def infer_scoring_type(unit: dict[str, Any], criterion_name: str, raw_text: str) -> str:
-    text = compact_text(" ".join([unit.get("unit_name", ""), criterion_name, raw_text, score_unit_text(unit)]))
-    if any(term in text for term in OBJECTIVE_KEYWORDS):
-        return "objective"
-    return "subjective"
-
-
 def keyword_objective_hit(unit: dict[str, Any], criterion_name: str, raw_text: str) -> bool:
     text = compact_text(" ".join([unit.get("unit_name", ""), criterion_name, raw_text, score_unit_text(unit)]))
     return any(term in text for term in OBJECTIVE_KEYWORDS)
@@ -964,6 +960,7 @@ def build_rule_based_criteria(score_units: list[dict[str, Any]]) -> list[dict[st
             raw_text = normalize_text(item["raw_text"])
             if review_standard and review_standard != raw_text:
                 raw_text = normalize_text(f"{raw_text}\n二、评分标准：{review_standard}")
+            objective_hit = keyword_objective_hit(unit, criterion_name, raw_text)
             criteria.append(
                 {
                     "criterion_id": f"PC-{unit_no:03d}-{item_index:02d}",
@@ -974,12 +971,15 @@ def build_rule_based_criteria(score_units: list[dict[str, Any]]) -> list[dict[st
                     "feature": feature,
                     "evaluation_method": f"该细则最高{item['score_text']}，按采购文件评分标准判断",
                     "score_text": item["score_text"],
-                    "scoring_type": infer_scoring_type(unit, criterion_name, raw_text),
+                    "scoring_type": "objective" if objective_hit else "subjective",
                     "raw_text": raw_text,
                     "source": {
                         "score_unit_page_start": unit.get("page_start"),
                         "score_unit_page_end": unit.get("page_end"),
                         "extraction_method": "rule_split_v0",
+                        "scoring_type_source": (
+                            "keyword_objective" if objective_hit else "needs_model_review"
+                        ),
                     },
                 }
             )
@@ -1001,6 +1001,7 @@ def build_criteria_refine_messages(criteria: list[dict[str, Any]]) -> list[dict[
         }
         for item in criteria
     ]
+    objective_keywords_hint = "、".join(OBJECTIVE_KEYWORDS)
     return [
         {
             "role": "system",
@@ -1008,7 +1009,10 @@ def build_criteria_refine_messages(criteria: list[dict[str, Any]]) -> list[dict[
                 "你是采购评分细则结构补全器。只能根据输入raw_text补全或修正字段："
                 "object、feature、evaluation_method、scoring_type。"
                 "不得新增采购文件没有的评分要求，不得改criterion_id，不得改criterion_name，"
-                "不得改score_text。scoring_type只能是subjective或objective。"
+                "不得改score_text。scoring_type只能是subjective或objective。\n"
+                f"判定scoring_type时优先参考已知客观特征关键词：{objective_keywords_hint}。"
+                "出现这些关键词或同义概念（证件资质、合同份数、人数门槛、固定公式、扫描件、社保职称等）一般为objective；"
+                "涉及理解程度、合理性、方案完整度、措施有效性、契合度等评估则为subjective。"
             ),
         },
         {
@@ -1057,13 +1061,21 @@ def refine_criteria_with_mimo(criteria: list[dict[str, Any]]) -> tuple[list[dict
     for item in criteria:
         update = updates.get(item["criterion_id"], {})
         merged = dict(item)
-        for key in ("object", "feature", "evaluation_method", "scoring_type"):
+        for key in ("object", "feature", "evaluation_method"):
             value = update.get(key)
             if isinstance(value, str) and value.strip():
                 merged[key] = normalize_text(value)
+
+        merged["source"] = dict(merged.get("source", {}))
+        scoring_type_source = merged["source"].get("scoring_type_source", "")
+        if scoring_type_source == "needs_model_review":
+            value = update.get("scoring_type")
+            if isinstance(value, str) and value.strip() in {"subjective", "objective"}:
+                merged["scoring_type"] = normalize_text(value)
+                merged["source"]["scoring_type_source"] = "model_review"
+
         if merged["scoring_type"] not in {"subjective", "objective"}:
             merged["scoring_type"] = item["scoring_type"]
-        merged["source"] = dict(merged.get("source", {}))
         merged["source"]["structure_refiner"] = config["model"]
         refined.append(merged)
     return refined, "rule_split_v0_mimo_structured"
@@ -1296,7 +1308,7 @@ def split_bid_technical_docx(docx_path: Path) -> list[dict[str, Any]]:
     in_technical_part = False
 
     for block in blocks:
-        if block.heading_level and block.heading_level <= 5 and block.text:
+        if block.heading_level and block.heading_level <= 5:
             if block.text == "技术响应文件":
                 in_technical_part = True
                 continue
@@ -1311,10 +1323,10 @@ def split_bid_technical_docx(docx_path: Path) -> list[dict[str, Any]]:
             for old_level in list(heading_stack):
                 if old_level >= level:
                     heading_stack.pop(old_level, None)
-            heading_stack[level] = block.text
+            heading_stack[level] = block.text or ""
             heading_path = [heading_stack[idx] for idx in sorted(heading_stack)]
             section_index += 1
-            current = empty_section(section_index, level, block.text, heading_path, block.block_id)
+            current = empty_section(section_index, level, block.text or "", heading_path, block.block_id)
             continue
 
         if not in_technical_part or current is None:
@@ -1816,11 +1828,18 @@ def structural_rule_links(
     links: list[dict[str, Any]] = []
     exact_links: list[dict[str, Any]] = []
 
+    compact_unit_name = compact_text(unit_name)
     for fragment in fragments:
         top_direction = normalize_text(fragment.get("top_score_direction", ""))
         title_text = compact_text(" ".join(fragment.get("heading_path", [])))
-        if unit_name and top_direction != unit_name and compact_text(unit_name) not in title_text:
-            continue
+        if unit_name:
+            if top_direction == unit_name:
+                pass
+            elif not top_direction and compact_unit_name and compact_unit_name in title_text:
+                # 顶级方向缺失（常见于空标题/不规范标题片段）时回落到 heading_path 命中 unit_name。
+                pass
+            else:
+                continue
 
         matched_terms = [
             term for term in focus_terms if compact_text(term) and compact_text(term) in title_text
@@ -1904,6 +1923,64 @@ def mimo_linked_fragments(
     return links
 
 
+LINKED_BID_FRAGMENT_KEYS: frozenset[str] = frozenset(
+    {"fragment_id", "heading_path", "evidence_text", "match_reason", "decision_source"}
+)
+
+
+def sanitize_linked_bid_fragments(mapping_doc: dict[str, Any]) -> dict[str, Any]:
+    """Strip non-contract keys from every linked_bid_fragments entry in mapping_doc."""
+    for mapping in mapping_doc.get("mappings", []):
+        links = mapping.get("linked_bid_fragments")
+        if not isinstance(links, list):
+            continue
+        mapping["linked_bid_fragments"] = [
+            {k: v for k, v in link.items() if k in LINKED_BID_FRAGMENT_KEYS}
+            for link in links
+            if isinstance(link, dict)
+        ]
+    return mapping_doc
+
+
+def atomic_write_mapping(mapping_doc: dict[str, Any]) -> None:
+    """Atomically replace PROCUREMENT_BID_MAPPING_JSON via unique temp file in same dir."""
+    PROCUREMENT_BID_MAPPING_JSON.parent.mkdir(parents=True, exist_ok=True)
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        dir=PROCUREMENT_BID_MAPPING_JSON.parent,
+        prefix=PROCUREMENT_BID_MAPPING_JSON.name + ".",
+        suffix=".tmp",
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            json.dump(mapping_doc, f, ensure_ascii=False, indent=2)
+        tmp_path.replace(PROCUREMENT_BID_MAPPING_JSON)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
+@contextmanager
+def mapping_file_lock():
+    """Exclusive fcntl.flock around all read+sanitize+replace and write of PROCUREMENT_BID_MAPPING_JSON.
+
+    Uses a sidecar .lock file so the lock identity survives atomic rename of the data file.
+    """
+    PROCUREMENT_BID_MAPPING_JSON.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = PROCUREMENT_BID_MAPPING_JSON.with_suffix(
+        PROCUREMENT_BID_MAPPING_JSON.suffix + ".lock"
+    )
+    lock_fd = open(lock_path, "w", encoding="utf-8")
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+    finally:
+        lock_fd.close()
+
+
 def map_criteria_to_bid_fragments(
     criteria: list[dict[str, Any]],
     fragments: list[dict[str, Any]],
@@ -1911,8 +1988,22 @@ def map_criteria_to_bid_fragments(
     force: bool = False,
 ) -> dict[str, Any]:
     if PROCUREMENT_BID_MAPPING_JSON.exists() and not force:
-        print(f"skip procurement-bid mapping: output exists {PROCUREMENT_BID_MAPPING_JSON}")
-        return json.loads(PROCUREMENT_BID_MAPPING_JSON.read_text(encoding="utf-8"))
+        with mapping_file_lock():
+            # 重新检查文件是否仍存在：锁外检查可能被并发 force 写入抢先
+            if PROCUREMENT_BID_MAPPING_JSON.exists():
+                print(f"skip procurement-bid mapping: output exists {PROCUREMENT_BID_MAPPING_JSON}")
+                cached = json.loads(PROCUREMENT_BID_MAPPING_JSON.read_text(encoding="utf-8"))
+                before = json.dumps(cached, ensure_ascii=False, sort_keys=True)
+                sanitize_linked_bid_fragments(cached)
+                after = json.dumps(cached, ensure_ascii=False, sort_keys=True)
+                if before != after:
+                    atomic_write_mapping(cached)
+                    print(
+                        f"rewrote cached mapping with sanitized linked_bid_fragments: {PROCUREMENT_BID_MAPPING_JSON}"
+                    )
+                return cached
+            # cache 在等锁期间被并发 force 删除/重写——回落到新建路径
+            print(f"cache vanished while waiting for lock, regenerating: {PROCUREMENT_BID_MAPPING_JSON}")
 
     mappings: list[dict[str, Any]] = []
     for index, criterion in enumerate(criteria, start=1):
@@ -1931,13 +2022,17 @@ def map_criteria_to_bid_fragments(
         else:
             links = structural_links
 
+        sanitized_links = [
+            {k: v for k, v in link.items() if k in LINKED_BID_FRAGMENT_KEYS}
+            for link in links
+        ]
         mappings.append(
             {
                 "criterion_id": criterion["criterion_id"],
                 "score_unit_id": criterion["score_unit_id"],
                 "score_unit_name": criterion["score_unit_name"],
                 "criterion_name": criterion["criterion_name"],
-                "linked_bid_fragments": links,
+                "linked_bid_fragments": sanitized_links,
                 "candidate_fragment_ids": [candidate["fragment"]["fragment_id"] for candidate in candidates],
             }
         )
@@ -1955,7 +2050,23 @@ def map_criteria_to_bid_fragments(
         },
         "mappings": mappings,
     }
-    PROCUREMENT_BID_MAPPING_JSON.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    with mapping_file_lock():
+        # 并发保护：non-force 调用在我们 compute 期间，可能有 force/其他 writer 抢先发布了
+        # 新 mapping。这种情况下不能用 stale in-memory result 覆盖 fresh disk，要 honor disk。
+        if not force and PROCUREMENT_BID_MAPPING_JSON.exists():
+            print(
+                f"another writer published mapping during regeneration; honoring it: {PROCUREMENT_BID_MAPPING_JSON}"
+            )
+            result = json.loads(PROCUREMENT_BID_MAPPING_JSON.read_text(encoding="utf-8"))
+            before = json.dumps(result, ensure_ascii=False, sort_keys=True)
+            sanitize_linked_bid_fragments(result)
+            after = json.dumps(result, ensure_ascii=False, sort_keys=True)
+            if before != after:
+                atomic_write_mapping(result)
+        else:
+            atomic_write_mapping(result)
+    # disk 已敲定 result（可能是我们的也可能是其他 writer 的），用最新的 mappings 渲染 MD
+    mappings = result["mappings"]
 
     md_lines = ["# 采购评分细则到投标响应片段映射", ""]
     for mapping in mappings:

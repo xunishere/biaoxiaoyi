@@ -19,6 +19,19 @@ iteration/
 model/AI测试数据-*/
 model/*.rar
 model/output/
+model/pp_structurev3_input/
+model/pp_structurev3_output/
+model/ragflow/
+model/dataset_extraction_output/*.lock
+model/dataset_extraction_output/final_scores_source.*
+model/dataset_extraction_output/bid_score_unit_annotations.*
+model/dataset_extraction_output/bid_technical_sections.*
+model/dataset_extraction_output/procurement_score_units_draft.*
+model/dataset_extraction_output/procurement_score_units_mimo_refined.*
+model/dataset_extraction_output/procurement_scoring_lines.json
+model/dataset_extraction_output/procurement_scoring_page_range.json
+model/openai-rfp-response-analyzer/assets/
+model/openai-rfp-response-analyzer/rfp-analyzer.png
 
 # 构建和打包相关
 dist/

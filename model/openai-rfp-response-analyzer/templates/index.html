@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>标小易 - 数据集切分与映射</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #647084;
+      --line: #d9dee8;
+      --panel: #ffffff;
+      --bg: #f4f6f9;
+      --blue: #2456d6;
+      --green: #16834a;
+      --red: #bc2d2d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 390px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+    aside {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 28px;
+      overflow-y: auto;
+    }
+    main {
+      padding: 28px;
+      overflow-y: auto;
+    }
+    h1 { margin: 0; font-size: 30px; letter-spacing: 0; }
+    h2 { margin: 0 0 14px; font-size: 18px; }
+    h3 { margin: 0 0 10px; font-size: 15px; }
+    p { color: var(--muted); line-height: 1.6; }
+    label { display: block; font-weight: 650; margin: 18px 0 8px; }
+    input[type="file"] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      background: var(--blue);
+    }
+    button.secondary { background: #4d5a6d; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .actions { display: grid; gap: 10px; margin-top: 20px; }
+    .checkline { display: flex; gap: 8px; align-items: center; margin-top: 12px; color: var(--muted); }
+    .checkline input { width: 16px; height: 16px; }
+    .status {
+      display: none;
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #edf3ff;
+      color: #1641a5;
+      white-space: pre-wrap;
+    }
+    .status.ok { display: block; background: #eaf8f0; color: var(--green); }
+    .status.err { display: block; background: #fff0f0; color: var(--red); }
+    .status.busy { display: block; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 90px;
+    }
+    .metric strong { display: block; font-size: 28px; margin-top: 8px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--line);
+      padding: 10px;
+      line-height: 1.5;
+    }
+    th { color: #33415c; background: #f8fafc; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 14px; }
+    .tab {
+      color: var(--ink);
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    .tab.active { color: #fff; background: var(--blue); border-color: var(--blue); }
+    .hidden { display: none; }
+    .chat-box {
+      height: 470px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px;
+    }
+    .msg { padding: 10px 0; border-bottom: 1px solid #eef1f6; white-space: pre-wrap; }
+    .msg b { display: inline-block; width: 52px; color: var(--blue); }
+    .chat-form { display: grid; grid-template-columns: 1fr 90px; gap: 10px; margin-top: 10px; }
+    .chat-form input { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    /* 自评 vs 实际总分对比 */
+    .score-compare {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .sc-tile {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: #fbfcfe;
+    }
+    .sc-tile .sc-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .sc-tile .sc-value { font-size: 24px; font-weight: 700; color: var(--ink); }
+    .sc-tile .sc-value-small { font-size: 15px; font-weight: 600; color: var(--ink); margin-top: 6px; line-height: 1.4; }
+    .sc-tile .sc-of { font-size: 14px; color: var(--muted); font-weight: 500; }
+    .sc-tile .sc-note { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+    .sc-tile.delta-high { background: #fff0f0; border-color: #f3c5c5; }
+    .sc-tile.delta-low { background: #fffaeb; border-color: #f0d9a3; }
+    .sc-tile.delta-ok { background: #eaf8f0; border-color: #b5e0c3; }
+    @media (max-width: 980px) {
+      .score-compare { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    /* 评分细则卡片 */
+    .crit-list { display: flex; flex-direction: column; gap: 8px; }
+    .crit-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .crit-head {
+      display: grid;
+      grid-template-columns: 100px minmax(0, 1fr) auto 20px;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .crit-head:hover { background: #f6f9ff; }
+    .crit-head .cid { font-weight: 700; color: var(--blue); font-size: 13px; font-family: ui-monospace, monospace; }
+    .crit-head .cname { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crit-head .cmeta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; justify-content: flex-end; }
+    .crit-head .badge {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 11px;
+    }
+    .badge.subjective { background: #fff3cd; color: #815b00; }
+    .badge.objective { background: #d4edda; color: #155724; }
+    .crit-head .score { font-weight: 700; color: var(--ink); font-size: 13px; }
+    .crit-head .counts { color: var(--muted); }
+    .crit-head .conf {
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: #eef1f6;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .crit-head .chev {
+      transition: transform 0.15s;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+    .crit-card.open .crit-head .chev { transform: rotate(90deg); }
+    .crit-body { border-top: 1px solid var(--line); padding: 14px 18px; background: #fbfcfe; }
+    .crit-row { margin-bottom: 14px; }
+    .crit-row:last-child { margin-bottom: 0; }
+    .crit-row h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 700; }
+    .crit-row ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+    .point {
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+    .point:last-child { margin-bottom: 0; }
+    .point-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 4px; }
+    .ptype { font-size: 11px; padding: 2px 6px; background: var(--blue); color: #fff; border-radius: 4px; font-weight: 600; }
+    .pname { font-size: 13px; color: var(--ink); }
+    .pbasis { font-size: 12px; color: var(--muted); }
+    /* 扣分点的 ptype 用红色区分 */
+    .crit-row:nth-child(2) .ptype { background: var(--red); }
+    /* 嵌套：命中片段折叠 */
+    .frag-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      margin-bottom: 6px;
+    }
+    .frag-head {
+      display: grid;
+      grid-template-columns: 75px minmax(0, 1fr) 60px 16px;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 12px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 13px;
+    }
+    .frag-head:hover { background: #f6f9ff; }
+    .frag-id { font-family: ui-monospace, monospace; color: var(--blue); font-weight: 600; font-size: 12px; }
+    .frag-path { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .frag-meta { color: var(--muted); font-size: 11px; text-align: right; }
+    .frag-chev { color: var(--muted); font-size: 11px; transition: transform 0.15s; text-align: right; }
+    .frag-card.open .frag-chev { transform: rotate(90deg); }
+    .frag-body {
+      border-top: 1px solid var(--line);
+      padding: 10px 14px;
+      background: #fbfcfe;
+      font-size: 13px;
+      line-height: 1.65;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+    .frag-evidence {
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      background: #fff7d6;
+      border-left: 3px solid #d2a90b;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #5a4500;
+    }
+    .frag-fulltext { white-space: pre-wrap; color: var(--ink); }
+    .frag-tabletext { margin-top: 8px; color: var(--ink); }
+    .frag-tabletext pre {
+      background: #f4f6f9;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: pre-wrap;
+      margin: 4px 0 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside>
+      <h1>标小易</h1>
+      <p>采购评分细则、投标响应片段、映射关系、响应特征和得扣分结构的数据集构建入口。</p>
+
+      <form id="uploadForm" enctype="multipart/form-data">
+        <label for="procurementFile">采购文件</label>
+        <input type="file" id="procurementFile" name="procurement" accept=".pdf,.doc,.docx,.wps,.rtf,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" required>
+
+        <label for="bidFile">投标技术文件</label>
+        <input type="file" id="bidFile" name="bid" accept=".pdf,.doc,.docx,.wps,.rtf,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" required>
+
+        <label for="finalScoresFile">最终得分文件（可选）</label>
+        <input type="file" id="finalScoresFile" name="final_scores" accept=".json,.pdf,.doc,.docx,.wps,.rtf,.txt,.md,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff">
+
+        <label class="checkline">
+          <input type="checkbox" name="skip_pp">
+          跳过 PP-StructureV3，使用已有评分表OCR结果
+        </label>
+        <label class="checkline">
+          <input type="checkbox" name="skip_mimo">
+          跳过 MiMo，只使用规则结果
+        </label>
+      </form>
+
+      <div class="actions">
+        <button id="processBtn" onclick="processDocuments()">运行切分/标注/映射</button>
+        <button class="secondary" onclick="generateReport()">刷新结果报告</button>
+      </div>
+
+      <div id="processingStatus" class="status"></div>
+
+      <div class="panel" style="margin-top: 22px;">
+        <h2>当前边界</h2>
+        <p>底层文档提取本来就是图片链路：PDF会先渲染为图片，图片会直接进入PP-StructureV3。Word/Excel等文件可以作为原始材料上传保存，直接结构化处理会逐步补转换器。最终得分文件也可能是图片，非JSON会先保存为原始得分文件。</p>
+      </div>
+    </aside>
+
+    <main>
+      <div class="tabs">
+        <button class="tab active" id="reportTabBtn" onclick="showTab('report')">流程与结果</button>
+        <button class="tab" id="chatTabBtn" onclick="showTab('chat')">数据集问答</button>
+      </div>
+
+      <section id="reportTab">
+        <div class="grid" id="metrics">
+          <div class="metric">评分细则<strong>-</strong></div>
+          <div class="metric">投标片段<strong>-</strong></div>
+          <div class="metric">映射命中<strong>-</strong></div>
+          <div class="metric">得扣分分析<strong>-</strong></div>
+        </div>
+
+        <div class="panel">
+          <h2>项目流程框架</h2>
+          <table>
+            <thead>
+              <tr><th>阶段</th><th>模型或算法</th><th>输入</th><th>输出</th></tr>
+            </thead>
+            <tbody>
+              {% for item in models %}
+              <tr>
+                <td>{{ item.stage }}</td>
+                <td>{{ item.model }}</td>
+                <td>{{ item.input }}</td>
+                <td>{{ item.output }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div id="report" class="panel">
+          <h2>结果报告</h2>
+        <p>上传采购文件和投标文件后，系统会生成 procurement_scoring_criteria、bid_response_fragments、procurement_bid_mapping、criterion_response_features 等正式数据。</p>
+        <p>如果同时上传 final_scores.json，会继续生成 score_point_analysis。</p>
+        </div>
+      </section>
+
+      <section id="chatTab" class="hidden">
+        <div class="panel">
+          <h2>围绕当前数据集提问</h2>
+          <div id="chatMessages" class="chat-box"></div>
+          <form class="chat-form" onsubmit="sendChatMessage(event)">
+            <input id="chatInput" type="text" placeholder="例如：主观评分项后面怎么学习写作结构？">
+            <button type="submit">发送</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function toggleCrit(head) {
+      const card = head.parentElement;
+      const body = card.querySelector('.crit-body');
+      const isOpen = card.classList.toggle('open');
+      body.style.display = isOpen ? 'block' : 'none';
+    }
+
+    function toggleFrag(head) {
+      const card = head.parentElement;
+      const body = card.querySelector('.frag-body');
+      const isOpen = card.classList.toggle('open');
+      body.style.display = isOpen ? 'block' : 'none';
+    }
+
+    function showTab(name) {
+      document.getElementById('reportTab').classList.toggle('hidden', name !== 'report');
+      document.getElementById('chatTab').classList.toggle('hidden', name !== 'chat');
+      document.getElementById('reportTabBtn').classList.toggle('active', name === 'report');
+      document.getElementById('chatTabBtn').classList.toggle('active', name === 'chat');
+    }
+
+    function setStatus(type, text) {
+      const box = document.getElementById('processingStatus');
+      box.className = 'status ' + type;
+      box.textContent = text;
+    }
+
+    function updateMetrics(metrics) {
+      if (!metrics) return;
+      document.getElementById('metrics').innerHTML = `
+        <div class="metric">评分细则<strong>${metrics.criteria ?? '-'}</strong></div>
+        <div class="metric">投标片段<strong>${metrics.bid_fragments ?? '-'}</strong></div>
+        <div class="metric">映射命中<strong>${metrics.criteria_with_links ?? '-'}/${metrics.mappings ?? '-'}</strong></div>
+        <div class="metric">得扣分分析<strong>${metrics.score_point_analysis ?? '-'}</strong></div>
+      `;
+    }
+
+    async function processDocuments() {
+      const form = document.getElementById('uploadForm');
+      const formData = new FormData(form);
+      const btn = document.getElementById('processBtn');
+      btn.disabled = true;
+      setStatus('busy', '正在提交后台任务...');
+      try {
+        const response = await fetch('/process', { method: 'POST', body: formData });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '处理失败');
+        if (!result.job_id) throw new Error('后台任务没有返回 job_id');
+        setStatus('busy', `任务已提交：${result.job_id}\n正在等待进度...`);
+        await pollJob(result.job_id, btn);
+      } catch (error) {
+        setStatus('err', error.message);
+        btn.disabled = false;
+      }
+    }
+
+    function finalScoreStatusText(value) {
+      if (value === 'uploaded') return '已保存新上传 final_scores.json';
+      if (value === 'uploaded_unstructured') return '已保存最终得分原始文件；需要结构化为 final_scores.json 后再跑得扣分分析';
+      if (value === 'existing') return '使用已有 final_scores.json';
+      return '未提供 final_scores.json，已跳过得扣分分析';
+    }
+
+    function renderJobStatus(job) {
+      const logs = (job.logs || []).slice(-12).map(item => {
+        const stage = item.stage ? ` [${item.stage}]` : '';
+        return `${item.time || ''}${stage} ${item.message}`;
+      }).join('\n');
+      const header = `任务：${job.job_id || ''}\n状态：${job.status || ''}\n阶段：${job.stage || ''}`;
+      return `${header}\n\n${logs}`;
+    }
+
+    async function pollJob(jobId, btn) {
+      while (true) {
+        const response = await fetch(`/jobs/${jobId}`);
+        const job = await response.json();
+        if (!response.ok) throw new Error(job.error || '读取任务状态失败');
+
+        if (job.status === 'completed') {
+          const result = job.result || {};
+          updateMetrics(result.metrics);
+          const scoreStatus = finalScoreStatusText(result.inputs?.final_scores);
+          setStatus('ok', `${result.message || '任务完成'}\n${scoreStatus}\n耗时：${result.elapsed_seconds}s\n输出目录：model/dataset_extraction_output`);
+          btn.disabled = false;
+          await generateReport();
+          return;
+        }
+
+        if (job.status === 'failed') {
+          setStatus('err', `${renderJobStatus(job)}\n\n错误：${job.error || '任务失败'}`);
+          btn.disabled = false;
+          return;
+        }
+
+        setStatus('busy', renderJobStatus(job));
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    }
+
+    async function generateReport() {
+      const report = document.getElementById('report');
+      report.innerHTML = '<h2>结果报告</h2><p>正在读取现有数据集输出...</p>';
+      const response = await fetch('/generate_report', { method: 'POST' });
+      const result = await response.json();
+      report.innerHTML = result.structured_report || '<p>暂无结果。</p>';
+    }
+
+    async function sendChatMessage(event) {
+      event.preventDefault();
+      const input = document.getElementById('chatInput');
+      const message = input.value.trim();
+      if (!message) return;
+      const box = document.getElementById('chatMessages');
+      box.innerHTML += `<div class="msg"><b>你</b>${message}</div>`;
+      input.value = '';
+      box.innerHTML += `<div class="msg" id="loadingMsg"><b>AI</b>分析当前数据集中...</div>`;
+      box.scrollTop = box.scrollHeight;
+      try {
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: message })
+        });
+        const result = await response.json();
+        document.getElementById('loadingMsg').remove();
+        if (!response.ok) throw new Error(result.error || '问答失败');
+        box.innerHTML += `<div class="msg"><b>AI</b>${result.response}</div>`;
+      } catch (error) {
+        const loading = document.getElementById('loadingMsg');
+        if (loading) loading.remove();
+        box.innerHTML += `<div class="msg"><b>错误</b>${error.message}</div>`;
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+
+    generateReport();
+  </script>
+</body>
+</html>

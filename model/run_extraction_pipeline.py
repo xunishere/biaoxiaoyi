@@ -14,8 +14,10 @@ The pipeline extracts and labels data only. It does not estimate scores.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import fcntl
 import json
+import math
 import os
 import re
 import subprocess
@@ -60,8 +62,13 @@ PROCUREMENT_BID_MAPPING_JSON = OUT_DIR / "procurement_bid_mapping.json"
 PROCUREMENT_BID_MAPPING_MD = OUT_DIR / "procurement_bid_mapping.md"
 CRITERION_RESPONSE_FEATURES_JSON = OUT_DIR / "criterion_response_features.json"
 CRITERION_RESPONSE_FEATURES_MD = OUT_DIR / "criterion_response_features.md"
+FINAL_SCORES_JSON = OUT_DIR / "final_scores.json"
+SCORE_POINT_ANALYSIS_JSON = OUT_DIR / "score_point_analysis.json"
+SCORE_POINT_ANALYSIS_MD = OUT_DIR / "score_point_analysis.md"
 
 RENDER_DPI = 180
+MAX_FRAGMENT_CHARS = 1500
+FRAGMENT_OVERLAP_CHARS = 150
 SCORE_RANGE_PAGE_RE = re.compile(r"\b\d+(?:\.\d+)?\s*[~～]\s*\d+(?:\.\d+)?\b")
 SCORE_RANGE_CELL_RE = re.compile(r"^\s*\d+(?:\.\d+)?\s*[~～\-—至]\s*\d+(?:\.\d+)?\s*$")
 PAREN_SCORE_RE = re.compile(r"[（(]\s*\d+(?:\.\d+)?\s*分\s*[)）]")
@@ -408,11 +415,20 @@ def save_scoring_page_range(pdf_path: Path) -> ScoringPageRange:
     return result
 
 
-def render_scoring_pages(pdf_path: Path, page_start: int, page_end: int) -> None:
+def render_scoring_pages(
+    pdf_path: Path,
+    page_start: int,
+    page_end: int,
+    force: bool = False,
+) -> None:
     PP_INPUT_DIR.mkdir(parents=True, exist_ok=True)
     expected = [PP_INPUT_DIR / f"page-{page}.png" for page in range(page_start, page_end + 1)]
-    if all(path.exists() for path in expected):
+    if not force and all(path.exists() for path in expected):
         return
+
+    if force:
+        for path in PP_INPUT_DIR.glob("page-*.png"):
+            path.unlink()
 
     subprocess.run(
         [
@@ -1561,21 +1577,66 @@ def write_bid_outputs(sections: list[dict[str, Any]], annotations: dict[str, Any
     BID_ANNOTATIONS_MD.write_text("\n".join(annotation_lines).strip() + "\n", encoding="utf-8")
 
 
+def split_fragment_chunks(
+    text: str,
+    max_chars: int = MAX_FRAGMENT_CHARS,
+    overlap_chars: int = FRAGMENT_OVERLAP_CHARS,
+) -> list[str]:
+    text = normalize_text(text)
+    if not text:
+        return []
+    if len(text) <= max_chars:
+        return [text]
+
+    paragraphs = [part.strip() for part in re.split(r"\n+|(?<=[。；;！？])", text) if part.strip()]
+    chunks: list[str] = []
+    current = ""
+
+    def push_current() -> None:
+        nonlocal current
+        if current.strip():
+            chunks.append(normalize_text(current))
+        current = ""
+
+    for paragraph in paragraphs:
+        if len(paragraph) > max_chars:
+            push_current()
+            start = 0
+            step = max_chars - overlap_chars
+            while start < len(paragraph):
+                chunks.append(paragraph[start : start + max_chars])
+                start += step
+            continue
+        candidate = normalize_text(f"{current}\n{paragraph}") if current else paragraph
+        if len(candidate) > max_chars:
+            push_current()
+            current = paragraph
+        else:
+            current = candidate
+    push_current()
+
+    return [chunk for chunk in chunks if chunk]
+
+
 def build_bid_response_fragments(sections: list[dict[str, Any]], force: bool = False) -> dict[str, Any]:
     if BID_FRAGMENTS_JSON.exists() and not force:
         print(f"skip bid response fragments: output exists {BID_FRAGMENTS_JSON}")
         return json.loads(BID_FRAGMENTS_JSON.read_text(encoding="utf-8"))
 
     fragments: list[dict[str, Any]] = []
-    for section in sections:
-        paragraph_texts = [paragraph["text"] for paragraph in section["paragraphs"] if paragraph["text"]]
-        table_texts = [table["text"] for table in section["tables"] if table["text"]]
-        image_refs = section["image_refs"]
-        text = normalize_text("\n".join(paragraph_texts))
-        table_text = normalize_text("\n\n".join(table_texts))
-        if not text and not table_text and not image_refs:
-            continue
 
+    def append_fragment(
+        section: dict[str, Any],
+        text: str,
+        table_text: str,
+        image_refs: list[str],
+        content_part: str,
+        chunk_index: int,
+        chunk_count: int,
+        source_char_count: int,
+        paragraph_count: int,
+        table_count: int,
+    ) -> None:
         fragments.append(
             {
                 "fragment_id": f"BF-{len(fragments) + 1:04d}",
@@ -1586,17 +1647,87 @@ def build_bid_response_fragments(sections: list[dict[str, Any]], force: bool = F
                 "table_text": table_text,
                 "image_refs": image_refs,
                 "char_count": len(text) + len(table_text),
-                "paragraph_count": len(paragraph_texts),
-                "table_count": len(section["tables"]),
+                "paragraph_count": paragraph_count,
+                "table_count": table_count,
                 "image_count": len(image_refs),
+                "content_part": content_part,
+                "chunk_index": chunk_index,
+                "chunk_count": chunk_count,
+                "source_section_char_count": source_char_count,
+                "chunking": {
+                    "method": "paragraph_boundary_sliding_window_v1",
+                    "max_chars": MAX_FRAGMENT_CHARS,
+                    "overlap_chars": FRAGMENT_OVERLAP_CHARS,
+                },
             }
         )
+
+    for section in sections:
+        paragraph_texts = [paragraph["text"] for paragraph in section["paragraphs"] if paragraph["text"]]
+        table_texts = [table["text"] for table in section["tables"] if table["text"]]
+        image_refs = section["image_refs"]
+        text = normalize_text("\n".join(paragraph_texts))
+        table_text = normalize_text("\n\n".join(table_texts))
+        if not text and not table_text and not image_refs:
+            continue
+
+        source_char_count = len(text) + len(table_text)
+        text_chunks = split_fragment_chunks(text)
+        table_chunks = split_fragment_chunks(table_text)
+        emitted = 0
+        total_chunks = len(text_chunks) + len(table_chunks)
+
+        for chunk in text_chunks:
+            emitted += 1
+            append_fragment(
+                section,
+                text=chunk,
+                table_text="",
+                image_refs=image_refs if emitted == 1 else [],
+                content_part="text",
+                chunk_index=emitted,
+                chunk_count=max(total_chunks, 1),
+                source_char_count=source_char_count,
+                paragraph_count=max(1, chunk.count("\n") + 1),
+                table_count=0,
+            )
+
+        for chunk in table_chunks:
+            emitted += 1
+            append_fragment(
+                section,
+                text="",
+                table_text=chunk,
+                image_refs=image_refs if emitted == 1 else [],
+                content_part="table",
+                chunk_index=emitted,
+                chunk_count=max(total_chunks, 1),
+                source_char_count=source_char_count,
+                paragraph_count=0,
+                table_count=len(section["tables"]),
+            )
+
+        if emitted == 0 and image_refs:
+            append_fragment(
+                section,
+                text="",
+                table_text="",
+                image_refs=image_refs,
+                content_part="image",
+                chunk_index=1,
+                chunk_count=1,
+                source_char_count=0,
+                paragraph_count=0,
+                table_count=0,
+            )
 
     result = {
         "source": {
             "bid_sections": relative_path(BID_SECTIONS_JSON),
-            "method": "non_empty_section_to_response_fragment_v0",
+            "method": "non_empty_section_to_response_fragment_chunked_v1",
             "scope": "technical_response_after_heading",
+            "max_fragment_chars": MAX_FRAGMENT_CHARS,
+            "fragment_overlap_chars": FRAGMENT_OVERLAP_CHARS,
         },
         "fragments": fragments,
     }
@@ -1608,7 +1739,8 @@ def build_bid_response_fragments(sections: list[dict[str, Any]], force: bool = F
         md_lines.append("")
         md_lines.append(
             f"chars={fragment['char_count']} paragraphs={fragment['paragraph_count']} "
-            f"tables={fragment['table_count']} images={fragment['image_count']}"
+            f"tables={fragment['table_count']} images={fragment['image_count']} "
+            f"part={fragment.get('content_part')} chunk={fragment.get('chunk_index')}/{fragment.get('chunk_count')}"
         )
         md_lines.append("")
         body = fragment["text"] or fragment["table_text"] or f"image_refs={fragment['image_refs']}"
@@ -1691,20 +1823,84 @@ def match_fragment_to_criterion(
     return score, matched[:12]
 
 
+def retrieval_tokens(text: str) -> list[str]:
+    normalized = normalize_text(text).lower()
+    words = re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]{2,}", normalized)
+    chars = re.findall(r"[\u4e00-\u9fff]", normalized)
+    char_bigrams = ["".join(chars[i : i + 2]) for i in range(len(chars) - 1)]
+    return words + char_bigrams
+
+
+def cosine_similarity(left: Counter[str], right: Counter[str]) -> float:
+    if not left or not right:
+        return 0.0
+    common = set(left) & set(right)
+    dot = sum(left[key] * right[key] for key in common)
+    left_norm = sum(value * value for value in left.values()) ** 0.5
+    right_norm = sum(value * value for value in right.values()) ** 0.5
+    if not left_norm or not right_norm:
+        return 0.0
+    return dot / (left_norm * right_norm)
+
+
+def criterion_retrieval_text(criterion: dict[str, Any]) -> str:
+    return normalize_text(
+        "\n".join(
+            [
+                criterion.get("score_unit_name", ""),
+                criterion.get("criterion_name", ""),
+                criterion.get("object", ""),
+                criterion.get("feature", ""),
+                criterion.get("raw_text", ""),
+            ]
+        )
+    )
+
+
+def fragment_retrieval_text(fragment: dict[str, Any]) -> str:
+    return normalize_text(
+        "\n".join(
+            [
+                " / ".join(fragment.get("heading_path", [])),
+                fragment.get("top_score_direction", ""),
+                fragment.get("text", ""),
+                fragment.get("table_text", ""),
+            ]
+        )
+    )
+
+
+def fragment_length_penalty(fragment: dict[str, Any]) -> float:
+    char_count = max(int(fragment.get("char_count") or 0), 1)
+    if char_count <= MAX_FRAGMENT_CHARS:
+        return 1.0
+    return 1.0 + math.log(char_count / MAX_FRAGMENT_CHARS)
+
+
 def recall_candidate_fragments(
     criterion: dict[str, Any],
     fragments: list[dict[str, Any]],
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     terms = criterion_terms(criterion)
+    criterion_vector = Counter(retrieval_tokens(criterion_retrieval_text(criterion)))
     candidates: list[dict[str, Any]] = []
     for fragment in fragments:
-        score, matched_terms = match_fragment_to_criterion(fragment, criterion, terms)
-        if score >= 4:
+        rule_score, matched_terms = match_fragment_to_criterion(fragment, criterion, terms)
+        fragment_vector = Counter(retrieval_tokens(fragment_retrieval_text(fragment)))
+        vector_similarity = cosine_similarity(criterion_vector, fragment_vector)
+        length_penalty = fragment_length_penalty(fragment)
+        normalized_rule_score = rule_score / length_penalty
+        combined_score = vector_similarity * 100 + min(normalized_rule_score, 30)
+        if vector_similarity >= 0.08 or normalized_rule_score >= 4:
             candidates.append(
                 {
                     "fragment": fragment,
-                    "match_score": round(score, 2),
+                    "match_score": round(combined_score, 2),
+                    "vector_similarity": round(vector_similarity, 4),
+                    "rule_boost": round(normalized_rule_score, 2),
+                    "raw_rule_score": round(rule_score, 2),
+                    "length_penalty": round(length_penalty, 3),
                     "matched_terms": matched_terms,
                 }
             )
@@ -2042,9 +2238,9 @@ def map_criteria_to_bid_fragments(
             "procurement_criteria": relative_path(PROCUREMENT_CRITERIA_JSON),
             "bid_response_fragments": relative_path(BID_FRAGMENTS_JSON),
             "method": (
-                "criterion_to_fragment_candidate_recall_mimo_hit_structural_fallback_v0"
+                "criterion_to_fragment_vector_recall_mimo_rerank_structural_fallback_v1"
                 if use_mimo
-                else "criterion_to_fragment_heuristic_structural_hit_v0"
+                else "criterion_to_fragment_vector_recall_structural_hit_v1"
             ),
             "task": "binary_hit_mapping_without_scoring",
         },
@@ -2545,6 +2741,755 @@ def load_final_dataset(path: Path, key: str) -> list[dict[str, Any]]:
     return items
 
 
+def parse_max_score(score_text: str) -> float:
+    match = re.search(r"(\d+(?:\.\d+)?)", score_text or "")
+    return float(match.group(1)) if match else 0.0
+
+
+def find_target_bidder(final_scores: dict[str, Any]) -> dict[str, Any] | None:
+    for bidder in final_scores.get("bidders", []):
+        if bidder.get("is_target"):
+            return bidder
+    return None
+
+
+def get_target_score_level(target_bidder: dict[str, Any]) -> str:
+    scores = target_bidder.get("scores") or []
+    if not scores:
+        return "unknown"
+    return scores[0].get("score_level", "unknown")
+
+
+def analyze_one_criterion(
+    criterion: dict[str, Any],
+    feature: dict[str, Any],
+    score_level: str,
+) -> dict[str, Any]:
+    """Rule-based 得扣分点抽取。
+
+    符合 .md §9.4 (主观项 coverage/depth/project_specific/execution/format) 和
+    .md §9.5 (客观项 missing_evidence/document_valid/threshold) 的口径。
+    score_level=='total' 时强制 confidence='low_total_only'，actual_score 留 null。
+    """
+    scoring_type = criterion.get("scoring_type", "subjective")
+    max_score = parse_max_score(criterion.get("score_text", ""))
+    linked_ids = list(feature.get("linked_fragment_ids") or [])
+    mapping_status = feature.get("mapping_status", "no_linked_fragment")
+
+    scoring_points: list[dict[str, Any]] = []
+    deduction_points: list[dict[str, Any]] = []
+    writing_pattern_to_keep: list[str] = []
+    writing_pattern_to_improve: list[str] = []
+
+    sp_counter = 0
+    dp_counter = 0
+
+    def add_sp(point_name: str, evidence_ids: list[str], basis: str, point_type: str) -> None:
+        nonlocal sp_counter
+        sp_counter += 1
+        scoring_points.append(
+            {
+                "point_id": f"SP-{sp_counter:03d}",
+                "point_type": point_type,
+                "point_name": point_name,
+                "evidence_fragment_ids": evidence_ids,
+                "evidence_text": "",
+                "basis": basis,
+            }
+        )
+
+    def add_dp(
+        point_name: str,
+        dtype: str,
+        related_req: str,
+        evidence_ids: list[str],
+        reason: str,
+    ) -> None:
+        nonlocal dp_counter
+        dp_counter += 1
+        deduction_points.append(
+            {
+                "point_id": f"DP-{dp_counter:03d}",
+                "deduction_type": dtype,
+                "point_name": point_name,
+                "related_requirement": related_req,
+                "evidence_fragment_ids": evidence_ids,
+                "evidence_text": "",
+                "deduction_reason": reason,
+                "deduction_score_estimate": None,
+            }
+        )
+
+    if mapping_status == "no_linked_fragment":
+        add_dp(
+            point_name=f"未在技术响应文件中找到对应「{criterion.get('criterion_name', '')}」的响应",
+            dtype="not_in_technical_scope" if scoring_type == "objective" else "coverage_gap",
+            related_req=criterion.get("criterion_name", ""),
+            evidence_ids=[],
+            reason="映射阶段未召回任何投标片段；可能在商务/报价文件而非技术文件，或写作完全缺失",
+        )
+    elif scoring_type == "objective":
+        ofeat = feature.get("objective_evidence_features") or {}
+        required = ofeat.get("required_evidence_terms_from_criterion") or []
+        detected = ofeat.get("detected_evidence_terms_in_linked_fragments") or []
+        evidence_type = ofeat.get("evidence_type", "objective_evidence")
+        stats = ofeat.get("linked_fragment_stats") or {}
+
+        if detected and len(detected) >= max(1, len(required) // 2):
+            add_sp(
+                point_name=f"检出客观证据词：{detected[:5]}",
+                evidence_ids=linked_ids,
+                basis=f"verification_mode={ofeat.get('verification_mode', '')}",
+                point_type="evidence_count_hit",
+            )
+        if required and not detected:
+            add_dp(
+                point_name=f"缺少必要的客观证据词（期望 {required[:5]}）",
+                dtype="missing_evidence",
+                related_req="、".join(required[:5]),
+                evidence_ids=linked_ids,
+                reason="required_evidence_terms_from_criterion 非空但 detected_evidence_terms 为空",
+            )
+        if stats.get("table_count", 0) == 0 and evidence_type in {
+            "contract_case",
+            "personnel_certificate",
+            "reputation_evidence",
+        }:
+            add_dp(
+                point_name="客观证据未以表格/清单形式承载",
+                dtype="invalid_document",
+                related_req=evidence_type,
+                evidence_ids=linked_ids,
+                reason="该 evidence_type 通常需要表格/清单，但 linked_fragment_stats.table_count=0",
+            )
+    else:
+        rf = (feature.get("subjective_writing_features") or {}).get("rule_features") or {}
+        stats = rf.get("text_stats") or {}
+        cov = rf.get("coverage_terms_found") or []
+        proj = rf.get("project_specific_terms") or []
+        writing = rf.get("writing_structure") or []
+        exec_el = rf.get("execution_elements") or []
+        fmt = rf.get("format_elements") or {}
+
+        char_count = int(stats.get("char_count", 0))
+        depth = int(stats.get("max_heading_depth", 0))
+        uses_table = bool(fmt.get("uses_table"))
+        uses_image = bool(fmt.get("uses_image"))
+        list_count = int(fmt.get("list_marker_count", 0))
+
+        if len(cov) >= 2:
+            add_sp(
+                f"覆盖采购评分细则核心对象：{cov[:5]}",
+                linked_ids,
+                f"coverage_terms_found={len(cov)}",
+                "coverage_hit",
+            )
+            writing_pattern_to_keep.append(
+                f"按 {cov[:3]} 等核心对象逐项展开是有效的覆盖结构"
+            )
+        if len(proj) >= 3:
+            add_sp(
+                f"内容结合本项目场景：{proj[:5]}",
+                linked_ids,
+                f"project_specific_terms={len(proj)}",
+                "project_specific_hit",
+            )
+            writing_pattern_to_keep.append("把通用方案绑定到本项目场景和专有名词")
+        if depth >= 2 and writing:
+            add_sp(
+                "文本具备清晰层级和模块化结构",
+                linked_ids,
+                f"max_heading_depth={depth} writing_structure={len(writing)}",
+                "structure_hit",
+            )
+        if len(exec_el) >= 4:
+            add_sp(
+                f"覆盖执行要素：{exec_el[:5]}",
+                linked_ids,
+                f"execution_elements={len(exec_el)}",
+                "execution_hit",
+            )
+        if uses_table or uses_image or list_count >= 5:
+            add_sp(
+                "表达形式多样（含表格/图示/清单）",
+                linked_ids,
+                f"uses_table={uses_table} uses_image={uses_image} list_marker_count={list_count}",
+                "format_hit",
+            )
+
+        if len(cov) == 0:
+            add_dp(
+                f"未明确覆盖评分细则关键对象「{criterion.get('object', '')}」",
+                "coverage_gap",
+                criterion.get("object", ""),
+                linked_ids,
+                "coverage_terms_found 为空",
+            )
+            writing_pattern_to_improve.append(
+                f"补充明确覆盖 {criterion.get('object', '')} 的内容"
+            )
+        if char_count < 500 and linked_ids:
+            add_dp(
+                f"展开深度不足（仅 {char_count} 字）",
+                "depth_gap",
+                criterion.get("feature", ""),
+                linked_ids,
+                f"linked 片段总 char_count={char_count} 偏短",
+            )
+            writing_pattern_to_improve.append("增加对核心要点的展开论述与案例细节")
+        if len(proj) == 0:
+            add_dp(
+                "未结合本项目专有名词/场景",
+                "project_specific_gap",
+                "本项目场景",
+                linked_ids,
+                "project_specific_terms 为空",
+            )
+            writing_pattern_to_improve.append("把通用模板与本项目业务对象/术语绑定")
+        if len(exec_el) == 0:
+            add_dp(
+                "缺少可执行要素（步骤、计划、责任、交付、验收）",
+                "execution_gap",
+                criterion.get("feature", ""),
+                linked_ids,
+                "execution_elements 为空",
+            )
+            writing_pattern_to_improve.append("补充阶段、责任、交付物、验收闭环等可执行要素")
+        if (not uses_table) and (not uses_image) and list_count < 3 and linked_ids:
+            add_dp(
+                "缺乏表格/图示/清单等结构化载体",
+                "evidence_gap",
+                criterion.get("feature", ""),
+                linked_ids,
+                "无表/图且列表项稀少（list_marker_count<3）",
+            )
+            writing_pattern_to_improve.append("用表格或图示承载关键信息，便于评审定位")
+
+    if score_level == "total":
+        actual_score: Any = None
+        score_status = (
+            "below_max_aggregate" if (scoring_points or deduction_points) else "unknown"
+        )
+        confidence = "low_total_only"
+        analysis_source = "rule_based_total_only"
+    elif score_level == "criterion":
+        actual_score = None
+        score_status = "criterion_score_pending_inject"
+        confidence = "pending_criterion_score"
+        analysis_source = "rule_based"
+    else:
+        actual_score = None
+        score_status = "unknown"
+        confidence = "unknown"
+        analysis_source = "rule_based"
+
+    return {
+        "criterion_id": criterion["criterion_id"],
+        "score_unit_id": criterion["score_unit_id"],
+        "score_unit_name": criterion["score_unit_name"],
+        "criterion_name": criterion["criterion_name"],
+        "scoring_type": scoring_type,
+        "max_score": max_score,
+        "actual_score": actual_score,
+        "lost_score": None,
+        "score_status": score_status,
+        "linked_fragment_ids": linked_ids,
+        "scoring_points": scoring_points,
+        "deduction_points": deduction_points,
+        "writing_pattern_to_keep": writing_pattern_to_keep,
+        "writing_pattern_to_improve": writing_pattern_to_improve,
+        "confidence": confidence,
+        "analysis_source": analysis_source,
+    }
+
+
+TIER_COEFFICIENT_TABLE: dict[str, float] = {
+    "T1_incumbent":       1.35,
+    "T2_same_buyer":      1.25,
+    "T3_similar_project": 1.15,
+    "T4_same_region":     1.08,
+    "T5_generic":         1.00,
+}
+
+
+def classify_tier_from_features(features: dict[str, Any]) -> str:
+    """从 tier_features 反推 tier_label。优先级 T1 > T2 > T3 > T4 > T5。"""
+    if features.get("is_incumbent"):
+        return "T1_incumbent"
+    if (features.get("same_buyer_history_count") or 0) >= 1:
+        return "T2_same_buyer"
+    if (features.get("similar_project_count") or 0) >= 1:
+        return "T3_similar_project"
+    if features.get("same_region"):
+        return "T4_same_region"
+    return "T5_generic"
+
+
+def resolve_tier_for_bidder(
+    bidder: dict[str, Any],
+    table: dict[str, float] | None = None,
+) -> tuple[str, float]:
+    """从 bidder.tier_features 拿 tier_label/coefficient；缺字段时按特征推断 + 查表。"""
+    table = table or TIER_COEFFICIENT_TABLE
+    tf = bidder.get("tier_features") or {}
+    label = tf.get("tier_label") or classify_tier_from_features(tf)
+    coefficient = tf.get("coefficient")
+    if not isinstance(coefficient, (int, float)):
+        coefficient = table.get(label, 1.00)
+    return label, float(coefficient)
+
+
+def apply_tier_coefficient_to_analyses(
+    analyses: list[dict[str, Any]],
+    tier_label: str,
+    coefficient: float,
+) -> None:
+    """对每条 analysis：actual_score 改名为 base_score，actual_score = min(base × c, max_score)。
+
+    out_of_scope（如报价分）保持原 actual_score=null 不变。
+    """
+    for entry in analyses:
+        if any(
+            dp.get("deduction_type") == "not_in_technical_scope"
+            for dp in (entry.get("deduction_points") or [])
+        ):
+            entry["tier_label"] = tier_label
+            entry["tier_coefficient"] = coefficient
+            entry["base_score"] = None
+            continue
+        base = entry.get("actual_score")
+        entry["tier_label"] = tier_label
+        entry["tier_coefficient"] = coefficient
+        if isinstance(base, (int, float)):
+            entry["base_score"] = round(float(base), 2)
+            max_score = entry.get("max_score") or 0
+            boosted = float(base) * coefficient
+            if max_score:
+                boosted = min(boosted, float(max_score))
+            entry["actual_score"] = round(boosted, 2)
+            if max_score:
+                entry["lost_score"] = round(float(max_score) - entry["actual_score"], 2)
+        else:
+            entry["base_score"] = None
+
+
+SCORING_POINT_TYPES = (
+    "coverage_hit",
+    "project_specific_hit",
+    "structure_hit",
+    "execution_hit",
+    "format_hit",
+    "evidence_count_hit",
+    "threshold_hit",
+    "document_valid",
+    "formula_valid",
+)
+
+DEDUCTION_POINT_TYPES = (
+    "coverage_gap",
+    "depth_gap",
+    "project_specific_gap",
+    "execution_gap",
+    "evidence_gap",
+    "missing_evidence",
+    "count_not_enough",
+    "threshold_not_met",
+    "invalid_document",
+    "not_in_technical_scope",
+)
+
+
+def build_mimo_attribution_messages(
+    rule_analysis: dict[str, Any],
+    criterion: dict[str, Any],
+    feature: dict[str, Any],
+    linked_fragments_text: dict[str, str],
+    total_constraint: dict[str, Any],
+) -> list[dict[str, str]]:
+    fragment_excerpts: list[str] = []
+    for fid, text in linked_fragments_text.items():
+        excerpt = (text or "").strip()[:800]
+        if excerpt:
+            fragment_excerpts.append(f"片段 {fid}:\n{excerpt}")
+    fragments_str = "\n\n".join(fragment_excerpts) if fragment_excerpts else "（无命中片段）"
+
+    feature_brief: dict[str, Any] = {
+        "scoring_type": feature.get("scoring_type"),
+        "mapping_status": feature.get("mapping_status"),
+        "linked_fragment_count": len(feature.get("linked_fragment_ids") or []),
+    }
+    if feature.get("subjective_writing_features"):
+        rf = (feature["subjective_writing_features"] or {}).get("rule_features") or {}
+        feature_brief["subjective_signals"] = {
+            "text_stats": rf.get("text_stats"),
+            "coverage_terms_found": rf.get("coverage_terms_found"),
+            "project_specific_terms": rf.get("project_specific_terms"),
+            "execution_elements": rf.get("execution_elements"),
+            "format_elements": rf.get("format_elements"),
+        }
+    if feature.get("objective_evidence_features"):
+        of = feature["objective_evidence_features"] or {}
+        feature_brief["objective_signals"] = {
+            "evidence_type": of.get("evidence_type"),
+            "verification_mode": of.get("verification_mode"),
+            "required_evidence_terms_from_criterion": of.get("required_evidence_terms_from_criterion"),
+            "detected_evidence_terms_in_linked_fragments": of.get("detected_evidence_terms_in_linked_fragments"),
+            "linked_fragment_stats": of.get("linked_fragment_stats"),
+        }
+
+    max_score = rule_analysis.get("max_score") or 0
+    sp_types_str = "、".join(SCORING_POINT_TYPES)
+    dp_types_str = "、".join(DEDUCTION_POINT_TYPES)
+    criterion_payload = {
+        "criterion_id": criterion["criterion_id"],
+        "score_unit_name": criterion["score_unit_name"],
+        "criterion_name": criterion["criterion_name"],
+        "object": criterion.get("object"),
+        "feature": criterion.get("feature"),
+        "evaluation_method": criterion.get("evaluation_method"),
+        "raw_text": (criterion.get("raw_text") or "")[:800],
+    }
+    rule_payload = {
+        "rule_scoring_points": rule_analysis.get("scoring_points", []),
+        "rule_deduction_points": rule_analysis.get("deduction_points", []),
+    }
+
+    return [
+        {
+            "role": "system",
+            "content": (
+                "你是采购评分得分点扣分点归因器，按 .md §9.6 口径工作。"
+                "对单条评分细则在最终总分约束下做归因式打分。\n"
+                "硬约束：\n"
+                f"1. estimated_actual_score 必须是 [0, {max_score}] 内的数值。\n"
+                "2. evidence_text 只能逐字从给定 fragment 原文中摘录（不超过 200 字），不得改写不得新增。\n"
+                "3. 不得新增采购文件没有的评分要求。\n"
+                "4. 主观项关注：覆盖度、深度、项目化、执行性、证据形式；客观项关注：材料齐全、数量门槛、有效性。\n"
+                f"5. scoring_points 的 point_type 必须从词表选择：{sp_types_str}。\n"
+                f"6. deduction_points 的 deduction_type 必须从词表选择：{dp_types_str}。\n"
+                "7. 没有命中片段时不得猜测 evidence_text，只能列扣分点。\n"
+                "8. 输出必须是合法 JSON。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"投标人最终总分约束：实际 {total_constraint.get('actual_total')} / "
+                f"满分 {total_constraint.get('max_total')}，整体失 {total_constraint.get('lost_total')} 分。"
+                f"本细则 max_score={max_score} 分；scoring_type={criterion.get('scoring_type')}。\n\n"
+                f"采购评分细则：\n{json.dumps(criterion_payload, ensure_ascii=False, indent=2)}\n\n"
+                f"特征信号：\n{json.dumps(feature_brief, ensure_ascii=False, indent=2)}\n\n"
+                f"已映射投标片段原文：\n{fragments_str}\n\n"
+                f"规则版分析（参考，可采纳/驳斥/补充）：\n{json.dumps(rule_payload, ensure_ascii=False)}\n\n"
+                "请输出 JSON 对象：\n"
+                "{\n"
+                f'  "estimated_actual_score": <float in [0, {max_score}]>,\n'
+                '  "scoring_points": [{"point_type": "...", "point_name": "...", "evidence_fragment_ids": ["BF-xxxx"], "evidence_text": "原文摘录", "basis": "..."}],\n'
+                '  "deduction_points": [{"deduction_type": "...", "point_name": "...", "evidence_fragment_ids": [], "evidence_text": "", "deduction_reason": "..."}],\n'
+                '  "writing_pattern_to_keep": ["..."],\n'
+                '  "writing_pattern_to_improve": ["..."]\n'
+                "}"
+            ),
+        },
+    ]
+
+
+def mimo_attribute_one_criterion(
+    rule_analysis: dict[str, Any],
+    criterion: dict[str, Any],
+    feature: dict[str, Any],
+    linked_fragments_text: dict[str, str],
+    total_constraint: dict[str, Any],
+    config: dict[str, str],
+) -> dict[str, Any]:
+    """按 .md §9.6 用 MiMo 做归因式打分，失败回退到规则版。
+
+    out_of_scope（如报价分）保留 rule_analysis 不动。
+    """
+    is_out_of_scope = any(
+        dp.get("deduction_type") == "not_in_technical_scope"
+        for dp in (rule_analysis.get("deduction_points") or [])
+    )
+    if is_out_of_scope:
+        return rule_analysis
+
+    messages = build_mimo_attribution_messages(
+        rule_analysis, criterion, feature, linked_fragments_text, total_constraint
+    )
+    try:
+        content = openai_compatible_chat(config, messages, max_tokens=1800, timeout_seconds=60)
+        parsed = extract_json_object(content)
+    except Exception as exc:
+        print(f"mimo attribution failed for {criterion['criterion_id']}: {exc}")
+        return rule_analysis
+
+    enhanced = dict(rule_analysis)
+    max_score = enhanced.get("max_score") or 0
+    actual = parsed.get("estimated_actual_score")
+    if isinstance(actual, (int, float)) and max_score:
+        clamped = max(0.0, min(float(max_score), float(actual)))
+        enhanced["actual_score"] = round(clamped, 2)
+        enhanced["lost_score"] = round(max_score - enhanced["actual_score"], 2)
+        enhanced["score_status"] = (
+            "max_score" if abs(max_score - enhanced["actual_score"]) < 1e-6
+            else "zero_score" if enhanced["actual_score"] < 1e-6
+            else "partial_score"
+        )
+
+    def _merge_points(
+        rule_points: list[dict[str, Any]],
+        parsed_points: list[dict[str, Any]] | None,
+        type_key: str,
+        allowed: tuple[str, ...],
+    ) -> list[dict[str, Any]]:
+        if not isinstance(parsed_points, list):
+            return rule_points
+        merged: list[dict[str, Any]] = []
+        counter = 0
+        prefix = "SP" if type_key == "point_type" else "DP"
+        for mp in parsed_points:
+            if not isinstance(mp, dict):
+                continue
+            ptype = (mp.get(type_key) or "").strip()
+            if ptype not in allowed:
+                continue
+            counter += 1
+            entry: dict[str, Any] = {
+                "point_id": f"{prefix}-{counter:03d}",
+                type_key: ptype,
+                "point_name": normalize_text(str(mp.get("point_name", "")))[:200],
+                "evidence_fragment_ids": [
+                    str(fid) for fid in (mp.get("evidence_fragment_ids") or []) if fid
+                ],
+                "evidence_text": normalize_text(str(mp.get("evidence_text", "")))[:400],
+            }
+            if type_key == "point_type":
+                entry["basis"] = normalize_text(str(mp.get("basis", "")))[:200]
+            else:
+                entry["related_requirement"] = normalize_text(str(mp.get("related_requirement", "")))[:120]
+                entry["deduction_reason"] = normalize_text(str(mp.get("deduction_reason", "")))[:300]
+                entry["deduction_score_estimate"] = mp.get("deduction_score_estimate")
+            merged.append(entry)
+        return merged if merged else rule_points
+
+    enhanced["scoring_points"] = _merge_points(
+        enhanced.get("scoring_points", []), parsed.get("scoring_points"), "point_type", SCORING_POINT_TYPES
+    )
+    enhanced["deduction_points"] = _merge_points(
+        enhanced.get("deduction_points", []), parsed.get("deduction_points"), "deduction_type", DEDUCTION_POINT_TYPES
+    )
+
+    def _string_list(value: Any) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [normalize_text(str(item))[:300] for item in value if str(item).strip()]
+
+    keep = _string_list(parsed.get("writing_pattern_to_keep"))
+    improve = _string_list(parsed.get("writing_pattern_to_improve"))
+    if keep:
+        enhanced["writing_pattern_to_keep"] = keep
+    if improve:
+        enhanced["writing_pattern_to_improve"] = improve
+
+    enhanced["confidence"] = "mimo_attributed_total_constrained"
+    enhanced["analysis_source"] = "rule_based_then_mimo_attributed"
+    return enhanced
+
+
+def analyze_score_points(
+    criteria: list[dict[str, Any]],
+    mappings: list[dict[str, Any]],
+    features: list[dict[str, Any]],
+    fragments: list[dict[str, Any]],
+    final_scores: dict[str, Any],
+    use_mimo: bool = True,
+    force: bool = False,
+) -> dict[str, Any]:
+    if SCORE_POINT_ANALYSIS_JSON.exists() and not force:
+        print(f"skip score point analysis: output exists {SCORE_POINT_ANALYSIS_JSON}")
+        return json.loads(SCORE_POINT_ANALYSIS_JSON.read_text(encoding="utf-8"))
+
+    target = find_target_bidder(final_scores)
+    if target is None:
+        raise RuntimeError("final_scores.json has no is_target=true bidder; cannot analyze")
+    score_level = get_target_score_level(target)
+    target_scores = target.get("scores") or []
+    total_actual = target_scores[0].get("actual_score") if target_scores else None
+    total_max = target_scores[0].get("max_score") if target_scores else None
+    total_lost = (
+        round(float(total_max) - float(total_actual), 2)
+        if isinstance(total_actual, (int, float)) and isinstance(total_max, (int, float))
+        else None
+    )
+    total_constraint = {
+        "actual_total": total_actual,
+        "max_total": total_max,
+        "lost_total": total_lost,
+    }
+
+    features_by_cid = {f["criterion_id"]: f for f in features}
+    criteria_by_cid = {c["criterion_id"]: c for c in criteria}
+    fragments_by_id = {f["fragment_id"]: f for f in fragments}
+
+    mimo_config = get_mimo_config() if use_mimo else None
+    method = (
+        "rule_based_then_mimo_attributed_total_constrained_v0"
+        if mimo_config
+        else "rule_based_score_point_analysis_total_only_v0"
+    )
+
+    analyses: list[dict[str, Any]] = []
+    total_mappings = len(mappings)
+    for index, mapping in enumerate(mappings, start=1):
+        cid = mapping["criterion_id"]
+        criterion = criteria_by_cid.get(cid)
+        feature = features_by_cid.get(cid)
+        if not criterion or not feature:
+            continue
+        rule_analysis = analyze_one_criterion(criterion, feature, score_level)
+        if mimo_config:
+            linked_text = {
+                fid: " ".join(
+                    filter(
+                        None,
+                        [
+                            fragments_by_id.get(fid, {}).get("text", ""),
+                            fragments_by_id.get(fid, {}).get("table_text", ""),
+                        ],
+                    )
+                )
+                for fid in (rule_analysis.get("linked_fragment_ids") or [])
+            }
+            print(
+                f"[attribute {index}/{total_mappings}] {cid} "
+                f"sp={len(rule_analysis.get('scoring_points', []))} "
+                f"dp={len(rule_analysis.get('deduction_points', []))} "
+                f"fragments={len(linked_text)}",
+                flush=True,
+            )
+            rule_analysis = mimo_attribute_one_criterion(
+                rule_analysis, criterion, feature, linked_text, total_constraint, mimo_config
+            )
+        analyses.append(rule_analysis)
+
+    tier_table = (
+        final_scores.get("tier_coefficient_table") or TIER_COEFFICIENT_TABLE
+    )
+    tier_label, tier_coefficient = resolve_tier_for_bidder(target, tier_table)
+    apply_tier_coefficient_to_analyses(analyses, tier_label, tier_coefficient)
+    print(
+        f"applied tier_coefficient {tier_coefficient} ({tier_label}) to "
+        f"{len(analyses)} analyses for target bidder"
+    )
+
+    result = {
+        "source": {
+            "procurement_criteria": relative_path(PROCUREMENT_CRITERIA_JSON),
+            "bid_response_fragments": relative_path(BID_FRAGMENTS_JSON),
+            "procurement_bid_mapping": relative_path(PROCUREMENT_BID_MAPPING_JSON),
+            "criterion_response_features": relative_path(CRITERION_RESPONSE_FEATURES_JSON),
+            "final_scores": relative_path(FINAL_SCORES_JSON),
+            "method": method,
+            "task": "score_point_and_deduction_point_analysis_under_final_score_constraint",
+        },
+        "target_bidder": {
+            "bidder_id": target.get("bidder_id"),
+            "name": target.get("name"),
+            "rank": target.get("rank"),
+            "score_level": score_level,
+            "actual_total_score": total_actual,
+            "max_total_score": total_max,
+            "lost_total_score": (
+                round(total_max - total_actual, 2)
+                if isinstance(total_actual, (int, float))
+                and isinstance(total_max, (int, float))
+                else None
+            ),
+            "tier_label": tier_label,
+            "tier_coefficient": tier_coefficient,
+            "tier_features": target.get("tier_features"),
+        },
+        "tier_coefficient_table": dict(tier_table) if isinstance(tier_table, dict) else None,
+        "analyses": analyses,
+    }
+    SCORE_POINT_ANALYSIS_JSON.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    write_score_point_analysis_md(result)
+    print(f"score point analysis: analyses={len(analyses)} score_level={score_level}")
+    return result
+
+
+def write_score_point_analysis_md(result: dict[str, Any]) -> None:
+    target = result["target_bidder"]
+    lines = ["# 得分点与扣分点分析数据集", ""]
+    lines.append(f"投标人：{target.get('name')}（排名 {target.get('rank')}）")
+    lines.append(
+        f"得分粒度：{target.get('score_level')} | 总分：{target.get('actual_total_score')} "
+        f"/ {target.get('max_total_score')} | 失分：{target.get('lost_total_score')}"
+    )
+    lines.append("")
+    lines.append(
+        "score_level=total 时所有条目 confidence=low_total_only；仅用于识别项目整体倾向性的薄弱单元，"
+        "不可下推到具体单元/细则当作真实得分。"
+    )
+    lines.append("")
+
+    for item in result["analyses"]:
+        lines.append(
+            f"## {item['criterion_id']} {item['score_unit_name']} / {item['criterion_name']} / {item['scoring_type']}"
+        )
+        lines.append("")
+        lines.append(
+            f"max={item['max_score']} status={item['score_status']} "
+            f"confidence={item['confidence']} linked={len(item['linked_fragment_ids'])}"
+        )
+        lines.append("")
+        if item["scoring_points"]:
+            lines.append("### 得分点")
+            for sp in item["scoring_points"]:
+                lines.append(f"- [{sp['point_type']}] {sp['point_name']}")
+                if sp.get("basis"):
+                    lines.append(f"  - basis: {sp['basis']}")
+        if item["deduction_points"]:
+            lines.append("### 扣分点")
+            for dp in item["deduction_points"]:
+                lines.append(f"- [{dp['deduction_type']}] {dp['point_name']}")
+                if dp.get("deduction_reason"):
+                    lines.append(f"  - reason: {dp['deduction_reason']}")
+        if item["writing_pattern_to_keep"]:
+            lines.append("### 建议保留的写作模式")
+            for p in item["writing_pattern_to_keep"]:
+                lines.append(f"- {p}")
+        if item["writing_pattern_to_improve"]:
+            lines.append("### 建议改进的写作模式")
+            for p in item["writing_pattern_to_improve"]:
+                lines.append(f"- {p}")
+        lines.append("")
+    SCORE_POINT_ANALYSIS_MD.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+
+
+def run_analysis_pipeline(args: argparse.Namespace) -> dict[str, Any]:
+    criteria = load_final_dataset(PROCUREMENT_CRITERIA_JSON, "criteria")
+    mappings = load_final_dataset(PROCUREMENT_BID_MAPPING_JSON, "mappings")
+    features = load_final_dataset(CRITERION_RESPONSE_FEATURES_JSON, "features")
+    fragments = load_final_dataset(BID_FRAGMENTS_JSON, "fragments")
+    if not FINAL_SCORES_JSON.exists():
+        raise FileNotFoundError(
+            f"Missing required dataset: {FINAL_SCORES_JSON}; create final_scores.json first per .md §9.1"
+        )
+    final_scores = json.loads(FINAL_SCORES_JSON.read_text(encoding="utf-8"))
+    return analyze_score_points(
+        criteria,
+        mappings,
+        features,
+        fragments,
+        final_scores,
+        use_mimo=not args.skip_mimo,
+        force=args.force_analysis or args.force_features or args.force_mimo,
+    )
+
+
 def run_feature_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     criteria = load_final_dataset(PROCUREMENT_CRITERIA_JSON, "criteria")
     fragments = load_final_dataset(BID_FRAGMENTS_JSON, "fragments")
@@ -2572,7 +3517,12 @@ def run_procurement_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     print(f"detected scoring pages: {page_range.page_start}-{page_range.page_end}")
 
     if not args.skip_pp:
-        render_scoring_pages(PROCUREMENT_PDF, page_range.page_start, page_range.page_end)
+        render_scoring_pages(
+            PROCUREMENT_PDF,
+            page_range.page_start,
+            page_range.page_end,
+            force=args.force_pp,
+        )
         run_pp_structurev3(page_range.page_start, page_range.page_end, force=args.force_pp)
 
     units_json = split_score_units_from_pp(scoring_pages)
@@ -2628,11 +3578,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--procurement-only", action="store_true", help="Only run procurement scoring extraction.")
     parser.add_argument("--bid-only", action="store_true", help="Only run bid technical split and annotation.")
     parser.add_argument("--features-only", action="store_true", help="Only extract response text features from final datasets.")
+    parser.add_argument("--analysis-only", action="store_true", help="Only run score point analysis (requires final_scores.json).")
     parser.add_argument("--skip-pp", action="store_true", help="Use existing PP-StructureV3 output.")
     parser.add_argument("--force-pp", action="store_true", help="Run PP-StructureV3 even if page outputs exist.")
     parser.add_argument("--skip-mimo", action="store_true", help="Skip all MiMo calls and use rule-based fallbacks.")
     parser.add_argument("--force-mimo", action="store_true", help="Re-run MiMo and derived outputs even if output exists.")
     parser.add_argument("--force-features", action="store_true", help="Rebuild criterion response feature outputs.")
+    parser.add_argument("--force-analysis", action="store_true", help="Rebuild score point analysis output.")
+    parser.add_argument("--skip-analysis", action="store_true", help="Skip the score point analysis stage even if final_scores.json exists.")
     return parser.parse_args()
 
 
@@ -2641,11 +3594,22 @@ def main() -> None:
     args = parse_args()
     if args.procurement_only and args.bid_only:
         raise SystemExit("--procurement-only and --bid-only cannot be used together")
-    if args.features_only and (args.procurement_only or args.bid_only):
-        raise SystemExit("--features-only cannot be combined with --procurement-only or --bid-only")
+    exclusives = sum(
+        bool(flag)
+        for flag in (args.procurement_only, args.bid_only, args.features_only, args.analysis_only)
+    )
+    if exclusives > 1:
+        raise SystemExit(
+            "--procurement-only / --bid-only / --features-only / --analysis-only are mutually exclusive"
+        )
 
     if args.features_only:
         run_feature_pipeline(args)
+        print(f"output: {OUT_DIR}")
+        return
+
+    if args.analysis_only:
+        run_analysis_pipeline(args)
         print(f"output: {OUT_DIR}")
         return
 
@@ -2653,6 +3617,9 @@ def main() -> None:
         run_procurement_pipeline(args)
     if not args.procurement_only:
         run_bid_pipeline(args)
+
+    if not args.procurement_only and not args.skip_analysis and FINAL_SCORES_JSON.exists():
+        run_analysis_pipeline(args)
 
     print(f"output: {OUT_DIR}")
 

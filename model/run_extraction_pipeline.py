@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-import fcntl
 import json
 import math
 import os
@@ -31,6 +30,16 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
+
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None  # type: ignore[assignment]
+
+try:
+    import msvcrt
+except ImportError:  # POSIX
+    msvcrt = None  # type: ignore[assignment]
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -2474,21 +2483,30 @@ def atomic_write_mapping(mapping_doc: dict[str, Any]) -> None:
 
 @contextmanager
 def mapping_file_lock():
-    """Exclusive fcntl.flock around all read+sanitize+replace and write of PROCUREMENT_BID_MAPPING_JSON.
+    """Exclusive file lock around mapping JSON reads/writes.
 
     Uses a sidecar .lock file so the lock identity survives atomic rename of the data file.
+    POSIX uses fcntl.flock; Windows uses msvcrt.locking on the first byte.
     """
     PROCUREMENT_BID_MAPPING_JSON.parent.mkdir(parents=True, exist_ok=True)
     lock_path = PROCUREMENT_BID_MAPPING_JSON.with_suffix(
         PROCUREMENT_BID_MAPPING_JSON.suffix + ".lock"
     )
-    lock_fd = open(lock_path, "w", encoding="utf-8")
+    lock_fd = open(lock_path, "a+", encoding="utf-8")
     try:
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        if fcntl is not None:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        elif msvcrt is not None:
+            lock_fd.seek(0)
+            msvcrt.locking(lock_fd.fileno(), msvcrt.LK_LOCK, 1)
         try:
             yield
         finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            if fcntl is not None:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            elif msvcrt is not None:
+                lock_fd.seek(0)
+                msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
     finally:
         lock_fd.close()
 

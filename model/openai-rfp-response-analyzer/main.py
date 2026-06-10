@@ -4,13 +4,16 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import threading
 import time
 import traceback
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
@@ -150,8 +153,8 @@ def model_manifest() -> list[dict[str, str]]:
         },
         {
             "stage": "得分点/扣分点分析",
-            "model": "规则分析器",
-            "input": "最终得分文件(JSON/PDF/Word/图片等；结构化后为final_scores.json) + 映射/特征数据",
+            "model": f"PaddleOCR/文本抽取 + {mimo_model}结构化 final_scores.json + 规则分析器",
+            "input": "最终得分文件(JSON/PDF/Word/图片等) + 映射/特征数据",
             "output": "得分点、扣分点、改进建议结构",
         },
     ]
@@ -170,6 +173,23 @@ def save_upload(field: str, fallback: str) -> Path:
     path = UPLOAD_DIR / f"{int(time.time())}_{safe_name(file.filename, fallback)}"
     file.save(path)
     return path
+
+
+def save_uploads(field: str, fallback: str) -> list[Path]:
+    """多文件版：从 request.files.getlist(field) 收所有上传文件，按上传顺序返回路径列表。
+
+    至少需要 1 个文件，否则抛错。允许 0 个的请用 save_optional_uploads。
+    """
+    files = [f for f in request.files.getlist(field) if f and f.filename]
+    if not files:
+        raise ValueError(f"缺少上传文件：{field}")
+    paths: list[Path] = []
+    base_ts = int(time.time())
+    for idx, file in enumerate(files):
+        path = UPLOAD_DIR / f"{base_ts}_{idx:02d}_{safe_name(file.filename, fallback)}"
+        file.save(path)
+        paths.append(path)
+    return paths
 
 
 def save_optional_upload(field: str, fallback: str) -> Path | None:
@@ -197,6 +217,307 @@ def ensure_file_type(path: Path, allowed: set[str], label: str) -> None:
         raise ValueError(f"{label}暂只支持 {allowed_text}，当前文件为 {suffix or '无扩展名'}")
 
 
+def chinese_number_to_int(text: str) -> int | None:
+    text = (text or "").strip()
+    if not text:
+        return None
+    if text.isdigit():
+        return int(text)
+    digits = {"零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+    if text == "十":
+        return 10
+    if "十" in text:
+        left, _, right = text.partition("十")
+        tens = digits.get(left, 1) if left else 1
+        ones = digits.get(right, 0) if right else 0
+        return tens * 10 + ones
+    return digits.get(text)
+
+
+def rank_from_filename(filename: str) -> int | None:
+    match = re.search(r"第([0-9一二两三四五六七八九十]+)名", filename or "")
+    if not match:
+        return None
+    return chinese_number_to_int(match.group(1))
+
+
+def default_tier_features(source: str = "auto_default_not_extracted_from_final_score_file") -> dict[str, Any]:
+    return {
+        "is_incumbent": False,
+        "same_buyer_history_count": 0,
+        "similar_project_count": 0,
+        "same_region": False,
+        "tier_label": "T5_generic",
+        "coefficient": 1.0,
+        "source": source,
+    }
+
+
+def ocr_image_to_text(image_path: Path) -> tuple[str, list[dict[str, Any]]]:
+    """用 PaddleOCR 提取最终得分图片文本，保留坐标方便后续追溯。"""
+    from paddleocr import PaddleOCR
+
+    last_error: Exception | None = None
+    attempts = [
+        {"device": "gpu:0"},
+        {"device": "cpu", "enable_mkldnn": False},
+        {"device": "cpu"},
+    ]
+    for kwargs in attempts:
+        try:
+            ocr = PaddleOCR(
+                lang="ch",
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+                **kwargs,
+            )
+            result = ocr.predict(str(image_path))[0]
+            texts = list(result.get("rec_texts") or [])
+            boxes_raw = result.get("rec_boxes")
+            boxes = list(boxes_raw) if boxes_raw is not None else []
+            lines: list[dict[str, Any]] = []
+            for index, text in enumerate(texts):
+                clean = pipeline.normalize_text(str(text))
+                if not clean:
+                    continue
+                box_value = boxes[index] if index < len(boxes) else None
+                box = box_value.tolist() if hasattr(box_value, "tolist") else box_value
+                x1 = float(box[0]) if box is not None and len(box) >= 4 else 0.0
+                y1 = float(box[1]) if box is not None and len(box) >= 4 else float(index)
+                lines.append({"text": clean, "box": box, "x1": x1, "y1": y1})
+            lines.sort(key=lambda item: (round(item["y1"] / 12), item["x1"]))
+            return "\n".join(item["text"] for item in lines), lines
+        except Exception as exc:
+            last_error = exc
+    raise RuntimeError(f"最终得分图片OCR失败：{last_error}") from last_error
+
+
+def extract_docx_text(path: Path) -> str:
+    """不依赖 python-docx，直接从 OOXML 提取段落文本。"""
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    with zipfile.ZipFile(path) as zf:
+        xml_text = zf.read("word/document.xml")
+    root = ElementTree.fromstring(xml_text)
+    lines: list[str] = []
+    for paragraph in root.findall(".//w:p", namespace):
+        parts: list[str] = []
+        for node in paragraph.iter():
+            if node.tag == f"{{{namespace['w']}}}t" and node.text:
+                parts.append(node.text)
+            elif node.tag == f"{{{namespace['w']}}}tab":
+                parts.append("\t")
+        line = pipeline.normalize_text("".join(parts))
+        if line:
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def extract_pdf_score_text(path: Path) -> str:
+    reader = PdfReader(str(path))
+    page_texts = [page.extract_text() or "" for page in reader.pages[:3]]
+    text = pipeline.normalize_text("\n".join(page_texts))
+    if text:
+        return text
+
+    temp_dir = pipeline.OUT_DIR / "final_scores_pdf_pages"
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    page_limit = min(len(reader.pages), 3)
+    subprocess.run(
+        [
+            "pdftoppm",
+            "-f",
+            "1",
+            "-l",
+            str(page_limit),
+            "-r",
+            "180",
+            "-png",
+            str(path),
+            str(temp_dir / "page"),
+        ],
+        check=True,
+    )
+    chunks = []
+    for image_path in sorted(temp_dir.glob("page-*.png")):
+        chunk, _ = ocr_image_to_text(image_path)
+        chunks.append(chunk)
+    return pipeline.normalize_text("\n".join(chunks))
+
+
+def extract_final_score_source_text(path: Path) -> tuple[str, list[dict[str, Any]]]:
+    suffix = path.suffix.lower()
+    if suffix in IMAGE_EXTENSIONS:
+        return ocr_image_to_text(path)
+    if suffix == ".pdf":
+        return extract_pdf_score_text(path), []
+    if suffix == ".docx":
+        return extract_docx_text(path), []
+    if suffix in {".txt", ".md", ".csv", ".json"}:
+        return path.read_text(encoding="utf-8", errors="ignore"), []
+    return "", []
+
+
+def fallback_final_scores_from_text(text: str, filename: str, source_file: str) -> dict[str, Any] | None:
+    compact = pipeline.normalize_text(text)
+    if not compact:
+        return None
+
+    score_match = re.search(r"得分[：:\s]*([0-9]+(?:\.[0-9]+)?)", compact)
+    if score_match is None:
+        score_match = re.search(r"总分[：:\s]*([0-9]+(?:\.[0-9]+)?)", compact)
+    if score_match is None:
+        return None
+    actual_score = float(score_match.group(1))
+
+    company_matches = re.findall(
+        r"([\u4e00-\u9fffA-Za-z0-9（）()·\-]{4,80}(?:有限公司|股份有限公司|集团有限公司|公司))",
+        compact,
+    )
+    bidder_name = company_matches[0] if company_matches else "目标投标人"
+
+    rank = None
+    rank_match = re.search(r"排名[：:\s]*第?([0-9一二两三四五六七八九十]+)名?", compact)
+    if rank_match:
+        rank = chinese_number_to_int(rank_match.group(1))
+    if rank is None:
+        rank = rank_from_filename(filename)
+
+    return {
+        "source": {
+            "source_file": source_file,
+            "extraction_method": "rule_fallback_from_ocr_text_v0",
+            "score_level": "total",
+        },
+        "bidders": [
+            {
+                "bidder_id": "B-001",
+                "name": bidder_name,
+                "is_target": True,
+                "rank": rank,
+                "scores": [
+                    {
+                        "score_name": "总分",
+                        "score_level": "total",
+                        "actual_score": actual_score,
+                        "max_score": 100,
+                    }
+                ],
+                "tier_features": default_tier_features(),
+            }
+        ],
+    }
+
+
+def normalize_final_scores_payload(payload: dict[str, Any], source_file: str) -> dict[str, Any]:
+    bidders = payload.get("bidders")
+    if not isinstance(bidders, list) or not bidders:
+        raise ValueError("结构化得分结果缺少 bidders")
+
+    normalized_bidders: list[dict[str, Any]] = []
+    has_target = False
+    for index, bidder in enumerate(bidders, start=1):
+        if not isinstance(bidder, dict):
+            continue
+        scores = bidder.get("scores") or []
+        normalized_scores: list[dict[str, Any]] = []
+        for score in scores:
+            if not isinstance(score, dict):
+                continue
+            actual = score.get("actual_score")
+            if not isinstance(actual, (int, float)):
+                continue
+            max_score = score.get("max_score")
+            normalized_scores.append(
+                {
+                    "score_name": score.get("score_name") or "总分",
+                    "score_level": score.get("score_level") or "total",
+                    "actual_score": round(float(actual), 2),
+                    "max_score": float(max_score) if isinstance(max_score, (int, float)) else 100,
+                }
+            )
+        if not normalized_scores:
+            continue
+        is_target = bool(bidder.get("is_target"))
+        has_target = has_target or is_target
+        normalized_bidders.append(
+            {
+                "bidder_id": bidder.get("bidder_id") or f"B-{index:03d}",
+                "name": pipeline.normalize_text(str(bidder.get("name") or f"投标人{index}")),
+                "is_target": is_target,
+                "rank": bidder.get("rank") if isinstance(bidder.get("rank"), int) else None,
+                "scores": normalized_scores,
+                "tier_features": {
+                    **default_tier_features(),
+                    **(bidder.get("tier_features") if isinstance(bidder.get("tier_features"), dict) else {}),
+                },
+            }
+        )
+    if not normalized_bidders:
+        raise ValueError("结构化得分结果没有可用分数")
+    if not has_target:
+        normalized_bidders[0]["is_target"] = True
+
+    source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
+    source.update(
+        {
+            "source_file": source.get("source_file") or source_file,
+            "extraction_method": source.get("extraction_method") or "mimo_from_ocr_text_v0",
+        }
+    )
+    return {"source": source, "bidders": normalized_bidders}
+
+
+def structure_final_scores_from_text(text: str, source_file: str, filename: str) -> dict[str, Any] | None:
+    fallback = fallback_final_scores_from_text(text, filename, source_file)
+    config = load_env_config()
+    if not config["api_key"] or not config["base_url"]:
+        return fallback
+
+    prompt = (
+        "你是最终评标得分文件结构化抽取器。只抽取原文或文件名明确给出的事实，"
+        "不得编造细则分、不得编造其他投标人得分。\n"
+        "如果文本中出现“你方得分/未能中标/排名”，该对象就是本次目标投标人 is_target=true。"
+        "如果只有总分，score_level 必须为 total，max_score 默认 100。"
+        "如果排名在文件名中如“第二名”，可以转成 rank=2。\n"
+        "输出 JSON：{\"source\": {\"extraction_method\": \"mimo_from_ocr_text_v0\"}, "
+        "\"bidders\": [{\"bidder_id\":\"B-001\",\"name\":\"...\",\"is_target\":true,"
+        "\"rank\":2,\"scores\":[{\"score_name\":\"总分\",\"score_level\":\"total\","
+        "\"actual_score\":73.63,\"max_score\":100}],\"tier_features\":{...}}]}"
+    )
+    client = OpenAI(api_key=config["api_key"], base_url=config["base_url"])
+    try:
+        response = client.chat.completions.create(
+            model=config["model"],
+            messages=[
+                {"role": "system", "content": prompt},
+                {
+                    "role": "user",
+                    "content": (
+                        f"文件名：{filename}\n"
+                        f"源文件：{source_file}\n"
+                        f"OCR/文本内容：\n{text[:8000]}"
+                    ),
+                },
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        parsed = pipeline.extract_json_object(response.choices[0].message.content or "")
+        normalized = normalize_final_scores_payload(parsed, source_file)
+        file_rank = rank_from_filename(filename)
+        if file_rank is not None:
+            for bidder in normalized["bidders"]:
+                if bidder.get("is_target") and bidder.get("rank") is None:
+                    bidder["rank"] = file_rank
+        return normalized
+    except Exception as exc:
+        print(f"final score MiMo structuring failed, fallback to rules: {exc}")
+        return fallback
+
+
 def save_final_scores(uploaded_path: Path | None) -> str:
     if uploaded_path is None:
         if pipeline.FINAL_SCORES_JSON.exists():
@@ -209,15 +530,34 @@ def save_final_scores(uploaded_path: Path | None) -> str:
         remove_score_outputs(include_final_scores=True)
         target = pipeline.OUT_DIR / f"final_scores_source{uploaded_path.suffix.lower()}"
         shutil.copyfile(uploaded_path, target)
+        rel_target = str(target.relative_to(ROOT_DIR))
+        extracted_text, ocr_lines = extract_final_score_source_text(target)
+        structured = structure_final_scores_from_text(extracted_text, rel_target, uploaded_path.name)
         metadata = {
-            "source_file": str(target.relative_to(ROOT_DIR)),
-            "status": "uploaded_unstructured",
-            "note": "最终得分原始文件已保存；得扣分分析需要先结构化为 final_scores.json。",
+            "source_file": rel_target,
+            "status": "uploaded_structured_from_source" if structured else "uploaded_unstructured",
+            "text_char_count": len(extracted_text),
+            "ocr_line_count": len(ocr_lines),
+            "note": (
+                "最终得分原始文件已保存，并已自动结构化为 final_scores.json。"
+                if structured
+                else "最终得分原始文件已保存；自动结构化失败，需要人工整理为 final_scores.json。"
+            ),
         }
+        if extracted_text:
+            metadata["extracted_text_preview"] = extracted_text[:1000]
+        if ocr_lines:
+            metadata["ocr_lines"] = ocr_lines[:80]
         (pipeline.OUT_DIR / "final_scores_source.json").write_text(
             json.dumps(metadata, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        if structured:
+            pipeline.FINAL_SCORES_JSON.write_text(
+                json.dumps(structured, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            return "uploaded_structured_from_source"
         return "uploaded_unstructured"
 
     try:
@@ -416,14 +756,105 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _process_one_procurement_file(
+    proc_file: Path,
+    skip_pp: bool,
+    emit: Any,
+) -> tuple[list[dict[str, Any]], str, dict[str, Any]]:
+    """跑单个采购文件，返回 (score_units, procurement_mode, page_range_meta)。"""
+    if proc_file.suffix.lower() == ".pdf":
+        page_range = pipeline.save_scoring_page_range(proc_file)
+        procurement_mode = "pdf_rendered_to_images"
+        emit("采购评分表定位", f"{proc_file.name}：检测到评分表页 {page_range.page_start}-{page_range.page_end}")
+        if not skip_pp:
+            emit("采购评分页渲染", f"{proc_file.name}：渲染评分表 PDF 页为 PNG")
+            pipeline.render_scoring_pages(
+                proc_file,
+                page_range.page_start,
+                page_range.page_end,
+                force=True,
+            )
+    elif is_image_file(proc_file):
+        page_range = prepare_procurement_image_page(proc_file)
+        procurement_mode = "uploaded_image_direct_to_pp_structurev3"
+        emit("采购评分表定位", f"{proc_file.name}：图片直接作为评分表页")
+    else:
+        raise ValueError(
+            f"{proc_file.name}：采购评分表提取当前可直接处理 PDF 或评分表图片；"
+            "Word/Excel等原始文件需要先转换成 PDF 或图片。"
+        )
+    scoring_pages = list(range(page_range.page_start, page_range.page_end + 1))
+
+    if not skip_pp:
+        emit("PP-StructureV3", f"{proc_file.name}：识别页 {page_range.page_start}-{page_range.page_end}")
+        pipeline.run_pp_structurev3(page_range.page_start, page_range.page_end, force=True)
+    else:
+        emit("PP-StructureV3", f"{proc_file.name}：跳过PP，使用现有 OCR 输出")
+
+    emit("评分单元切分", f"{proc_file.name}：按坐标聚行、切列、拼接跨页评分单元")
+    units_json = pipeline.split_score_units_from_pp(scoring_pages)
+    score_units = units_json.get("score_units", [])
+    if proc_file.suffix.lower() == ".pdf" and len(score_units) < 6:
+        emit(
+            "评分单元切分",
+            f"{proc_file.name}：PP几何切分仅得到 {len(score_units)} 条，尝试 PDF 文本评分表兜底切分",
+        )
+        fallback_units_json = pipeline.split_score_units_from_pdf_text(
+            proc_file,
+            page_range.page_start,
+            page_range.page_end,
+        )
+        fallback_units = fallback_units_json.get("score_units", [])
+        if len(fallback_units) > len(score_units):
+            units_json = fallback_units_json
+            score_units = fallback_units
+            emit("评分单元切分", f"{proc_file.name}：PDF文本兜底切出 {len(score_units)} 条评分单元")
+    emit("评分单元切分", f"{proc_file.name}：评分单元 {len(score_units)} 条")
+    return score_units, procurement_mode, {
+        "file": str(proc_file.relative_to(ROOT_DIR)),
+        "page_start": page_range.page_start,
+        "page_end": page_range.page_end,
+        "procurement_mode": procurement_mode,
+    }
+
+
+def _process_one_bid_file(bid_file: Path, emit: Any) -> tuple[list[dict[str, Any]], str]:
+    """跑单个投标文件，返回 (sections, bid_split_method)。"""
+    if bid_file.suffix.lower() == ".docx":
+        sections = pipeline.split_bid_technical_docx(bid_file)
+        method = "docx_ooxml_heading_split_v0"
+    elif bid_file.suffix.lower() == ".pdf":
+        sections = split_bid_pdf_to_sections(bid_file)
+        method = "pdf_text_heading_split_v0"
+    elif is_image_file(bid_file):
+        sections = split_bid_image_to_sections(bid_file)
+        method = "image_reference_fragment_v0"
+    else:
+        raise ValueError(
+            f"{bid_file.name}：投标响应片段切分当前可直接处理 DOCX、PDF 或图片；"
+            "其他 Word/Excel 等格式需要先转换。"
+        )
+    emit("投标响应片段切分", f"{bid_file.name}：章节 {len(sections)} 条（split_method={method}）")
+    return sections, method
+
+
 def run_openbidkit_pipeline(
-    procurement_file: Path,
-    bid_file: Path,
+    procurement_files: list[Path] | Path,
+    bid_files: list[Path] | Path,
     skip_pp: bool,
     skip_mimo: bool,
     final_scores_status: str,
     progress: Any | None = None,
 ) -> dict[str, Any]:
+    if isinstance(procurement_files, Path):
+        procurement_files = [procurement_files]
+    if isinstance(bid_files, Path):
+        bid_files = [bid_files]
+    if not procurement_files:
+        raise ValueError("至少需要 1 份采购文件")
+    if not bid_files:
+        raise ValueError("至少需要 1 份投标文件")
+
     def emit(stage: str, message: str) -> None:
         print(f"[{stage}] {message}", flush=True)
         if progress:
@@ -432,45 +863,82 @@ def run_openbidkit_pipeline(
     emit("排队", "等待流水线锁，避免多个PP/MiMo任务同时抢GPU和输出文件。")
     with PIPELINE_LOCK:
         started = time.time()
-        emit("采购评分表定位", f"开始处理采购文件：{procurement_file.name}")
-        if procurement_file.suffix.lower() == ".pdf":
-            page_range = pipeline.save_scoring_page_range(procurement_file)
-            procurement_mode = "pdf_rendered_to_images"
-            emit("采购评分表定位", f"检测到评分表页：{page_range.page_start}-{page_range.page_end}")
-            if not skip_pp:
-                emit("采购评分页渲染", "正在把评分表PDF页渲染为PNG，供PP-StructureV3识别。")
-                pipeline.render_scoring_pages(
-                    procurement_file,
-                    page_range.page_start,
-                    page_range.page_end,
-                    force=True,
+        emit("采购评分表定位", f"开始处理 {len(procurement_files)} 份采购文件")
+
+        merged_score_units: list[dict[str, Any]] = []
+        procurement_modes: list[str] = []
+        procurement_metas: list[dict[str, Any]] = []
+        skipped_procurement_metas: list[dict[str, Any]] = []
+        for proc_file in procurement_files:
+            try:
+                file_units, mode, meta = _process_one_procurement_file(proc_file, skip_pp, emit)
+            except Exception as exc:
+                reason = str(exc)
+                skipped_procurement_metas.append(
+                    {
+                        "file": str(proc_file.relative_to(ROOT_DIR)),
+                        "status": "skipped_no_scoring_table",
+                        "reason": reason,
+                    }
                 )
-        elif is_image_file(procurement_file):
-            page_range = prepare_procurement_image_page(procurement_file)
-            procurement_mode = "uploaded_image_direct_to_pp_structurev3"
-            emit("采购评分表定位", "采购文件是图片，直接作为评分表页进入PP-StructureV3。")
-        else:
-            raise ValueError("采购评分表提取当前可直接处理 PDF 或评分表图片；Word/Excel等原始文件已允许上传，但需要先转换成PDF或图片。")
-        scoring_pages = list(range(page_range.page_start, page_range.page_end + 1))
+                emit("采购评分表定位", f"{proc_file.name}：未作为评分表来源，原因：{reason}")
+                continue
 
-        if not skip_pp:
-            emit("PP-StructureV3", f"正在识别评分页 {page_range.page_start}-{page_range.page_end}。首次启动会初始化多个模型，可能需要几分钟。")
-            pipeline.run_pp_structurev3(page_range.page_start, page_range.page_end, force=True)
-        else:
-            emit("PP-StructureV3", "已跳过PP-StructureV3，使用现有OCR结果。")
+            if not file_units:
+                skipped_procurement_metas.append(
+                    {
+                        "file": str(proc_file.relative_to(ROOT_DIR)),
+                        "status": "skipped_empty_score_units",
+                        "reason": "评分表页已定位但未切出评分单元",
+                    }
+                )
+                emit("评分单元切分", f"{proc_file.name}：未切出评分单元，跳过该采购文件")
+                continue
 
-        emit("评分单元切分", "正在按表格坐标聚行、切列，并拼接跨页评分单元。")
-        units_json = pipeline.split_score_units_from_pp(scoring_pages)
-        emit("评分单元切分", f"评分单元草稿数量：{len(units_json.get('score_units', []))}")
+            for unit in file_units:
+                unit["source_procurement_file"] = meta["file"]
+                merged_score_units.append(unit)
+            procurement_modes.append(mode)
+            procurement_metas.append(meta)
+
+        if not merged_score_units:
+            details = "; ".join(
+                f"{Path(item['file']).name}: {item['reason']}"
+                for item in skipped_procurement_metas
+            ) or "没有可用采购文件"
+            raise RuntimeError(
+                "所有采购文件都未能定位到评分表。请确认至少上传一份包含“综合评分法/评分项目/分值区间/评分办法”"
+                f"的采购文件或评分表图片。详情：{details}"
+            )
+
+        # 跨文件重编号 unit_id，并落盘合并后的 score_units 草稿，给下游 MiMo/criteria 用。
+        for idx, unit in enumerate(merged_score_units, start=1):
+            unit["unit_id"] = f"TU-DRAFT-{idx:03d}"
+        merged_units_json = {
+            "source": {
+                "uploaded_procurement_files": [str(path.relative_to(ROOT_DIR)) for path in procurement_files],
+                "procurement_files": [meta["file"] for meta in procurement_metas],
+                "skipped_procurement_files": skipped_procurement_metas,
+                "method": "geometry_text_split_v0_multi_file_merged",
+                "task": "multi_procurement_file_merge",
+            },
+            "score_units": merged_score_units,
+        }
+        pipeline.PROCUREMENT_UNITS_JSON.write_text(
+            json.dumps(merged_units_json, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        emit("评分单元切分", f"合并后评分单元总数：{len(merged_score_units)}（{len(procurement_files)} 份文件）")
+
         if skip_mimo:
-            score_units = units_json["score_units"]
+            score_units = merged_units_json["score_units"]
             emit("MiMo文本规整", "已跳过MiMo，评分单元使用规则切分原文。")
         else:
-            emit("MiMo文本规整", "正在用MiMo做评分单元OCR文本机械规整。")
-            pipeline.refine_score_units_with_mimo(units_json, force=True)
+            emit("MiMo文本规整", f"用 MiMo 规整 {len(merged_score_units)} 条评分单元 OCR 文本")
+            pipeline.refine_score_units_with_mimo(merged_units_json, force=True)
             score_units = pipeline.load_score_units_for_bid_annotation()
 
-        emit("评分细则拆分与标注", "正在拆分评分细则，并补全对象、特性、评价方法、主观/客观。")
+        emit("评分细则拆分与标注", "拆分评分细则并补全 object/feature/scoring_type")
         criteria_json = pipeline.extract_procurement_criteria(
             score_units,
             use_mimo=not skip_mimo,
@@ -478,20 +946,22 @@ def run_openbidkit_pipeline(
         )
         emit("评分细则拆分与标注", f"评分细则数量：{len(criteria_json.get('criteria', []))}")
 
-        emit("投标响应片段切分", f"开始处理投标文件：{bid_file.name}")
-        if bid_file.suffix.lower() == ".docx":
-            sections = pipeline.split_bid_technical_docx(bid_file)
-            bid_split_method = "docx_ooxml_heading_split_v0"
-        elif bid_file.suffix.lower() == ".pdf":
-            sections = split_bid_pdf_to_sections(bid_file)
-            bid_split_method = "pdf_text_heading_split_v0"
-        elif is_image_file(bid_file):
-            sections = split_bid_image_to_sections(bid_file)
-            bid_split_method = "image_reference_fragment_v0"
-        else:
-            raise ValueError("投标响应片段切分当前可直接处理 DOCX、PDF 或图片；其他Word/Excel等格式需要先转换。")
+        emit("投标响应片段切分", f"开始处理 {len(bid_files)} 份投标文件")
+        merged_sections: list[dict[str, Any]] = []
+        bid_split_methods: list[str] = []
+        for bid_file in bid_files:
+            file_sections, method = _process_one_bid_file(bid_file, emit)
+            for s in file_sections:
+                s["source_bid_file"] = str(bid_file.relative_to(ROOT_DIR))
+                merged_sections.append(s)
+            bid_split_methods.append(method)
 
-        emit("投标响应片段切分", f"投标章节数量：{len(sections)}。正在生成可召回片段。")
+        # 跨文件重编号 section_id，避免 BID-SEC-0001 在多文件下冲突。
+        for idx, s in enumerate(merged_sections, start=1):
+            s["section_id"] = f"BID-SEC-{idx:04d}"
+        sections = merged_sections
+        bid_split_method = "+".join(sorted(set(bid_split_methods))) or "unknown"
+        emit("投标响应片段切分", f"合并后投标章节总数：{len(sections)}")
         annotations = pipeline.annotate_bid_sections(sections, score_units)
         pipeline.write_bid_outputs(sections, annotations)
         fragments_json = pipeline.build_bid_response_fragments(sections, force=True)
@@ -518,7 +988,7 @@ def run_openbidkit_pipeline(
         emit("响应文本特征", f"响应特征数量：{len(features_json.get('features', []))}")
 
         analysis_json = None
-        if final_scores_status in {"uploaded", "existing"} and pipeline.FINAL_SCORES_JSON.exists():
+        if final_scores_status in {"uploaded", "existing", "uploaded_structured_from_source"} and pipeline.FINAL_SCORES_JSON.exists():
             emit("得扣分分析", "检测到结构化final_scores.json，正在生成得分点/扣分点。")
             final_scores = load_json(pipeline.FINAL_SCORES_JSON)
             analysis_json = pipeline.analyze_score_points(
@@ -539,15 +1009,20 @@ def run_openbidkit_pipeline(
             "message": "数据集切分、标注与映射完成",
             "elapsed_seconds": round(time.time() - started, 1),
             "inputs": {
-                "procurement_file": str(procurement_file.relative_to(ROOT_DIR)),
-                "procurement_mode": procurement_mode,
-                "bid_file": str(bid_file.relative_to(ROOT_DIR)),
+                "uploaded_procurement_files": [str(path.relative_to(ROOT_DIR)) for path in procurement_files],
+                "procurement_files": [meta["file"] for meta in procurement_metas],
+                "skipped_procurement_files": skipped_procurement_metas,
+                "procurement_modes": procurement_modes,
+                "procurement_per_file": procurement_metas,
+                "bid_files": [str(p.relative_to(ROOT_DIR)) for p in bid_files],
                 "bid_split_method": bid_split_method,
             },
             "models": model_manifest(),
             "metrics": {
-                "scoring_page_start": page_range.page_start,
-                "scoring_page_end": page_range.page_end,
+                "procurement_file_count": len(procurement_files),
+                "procurement_scoring_file_count": len(procurement_metas),
+                "procurement_skipped_count": len(skipped_procurement_metas),
+                "bid_file_count": len(bid_files),
                 "score_units": len(score_units),
                 "criteria": len(criteria_json["criteria"]),
                 "bid_sections": len(sections),
@@ -575,8 +1050,8 @@ def run_openbidkit_pipeline(
 
 def run_pipeline_job(
     job_id: str,
-    procurement_pdf: Path,
-    bid_file: Path,
+    procurement_files: list[Path] | Path,
+    bid_files: list[Path] | Path,
     skip_pp: bool,
     skip_mimo: bool,
     final_scores_status: str,
@@ -589,8 +1064,8 @@ def run_pipeline_job(
     try:
         progress("启动", "后台任务已启动。")
         result = run_openbidkit_pipeline(
-            procurement_pdf,
-            bid_file,
+            procurement_files,
+            bid_files,
             skip_pp=skip_pp,
             skip_mimo=skip_mimo,
             final_scores_status=final_scores_status,
@@ -1033,11 +1508,13 @@ def index():
 @app.route("/process", methods=["POST"])
 def process_documents():
     try:
-        procurement_pdf = save_upload("procurement", "procurement.pdf")
-        bid_file = save_upload("bid", "bid.docx")
+        procurement_files = save_uploads("procurement", "procurement.pdf")
+        bid_files = save_uploads("bid", "bid.docx")
         final_scores_file = save_optional_upload("final_scores", "final_scores.json")
-        ensure_file_type(procurement_pdf, DOCUMENT_EXTENSIONS, "采购文件")
-        ensure_file_type(bid_file, DOCUMENT_EXTENSIONS, "投标文件")
+        for p in procurement_files:
+            ensure_file_type(p, DOCUMENT_EXTENSIONS, "采购文件")
+        for p in bid_files:
+            ensure_file_type(p, DOCUMENT_EXTENSIONS, "投标文件")
         final_scores_status = save_final_scores(final_scores_file)
 
         job_id = uuid.uuid4().hex
@@ -1049,19 +1526,23 @@ def process_documents():
             updated_at=now_ts(),
             logs=[],
             inputs={
-                "procurement_file": str(procurement_pdf.relative_to(ROOT_DIR)),
-                "bid_file": str(bid_file.relative_to(ROOT_DIR)),
+                "procurement_files": [str(p.relative_to(ROOT_DIR)) for p in procurement_files],
+                "bid_files": [str(p.relative_to(ROOT_DIR)) for p in bid_files],
                 "final_scores": final_scores_status,
             },
         )
-        append_job_log(job_id, "任务已创建，等待后台执行。", stage="排队")
+        append_job_log(
+            job_id,
+            f"任务已创建：采购 {len(procurement_files)} 份、投标 {len(bid_files)} 份，等待后台执行。",
+            stage="排队",
+        )
 
         thread = threading.Thread(
             target=run_pipeline_job,
             args=(
                 job_id,
-                procurement_pdf,
-                bid_file,
+                procurement_files,
+                bid_files,
                 request.form.get("skip_pp") == "on",
                 request.form.get("skip_mimo") == "on",
                 final_scores_status,
@@ -1088,16 +1569,18 @@ def get_job(job_id: str):
 def process_documents_sync():
     """Debug endpoint: keep the old synchronous behavior for local troubleshooting."""
     try:
-        procurement_pdf = save_upload("procurement", "procurement.pdf")
-        bid_file = save_upload("bid", "bid.docx")
+        procurement_files = save_uploads("procurement", "procurement.pdf")
+        bid_files = save_uploads("bid", "bid.docx")
         final_scores_file = save_optional_upload("final_scores", "final_scores.json")
-        ensure_file_type(procurement_pdf, DOCUMENT_EXTENSIONS, "采购文件")
-        ensure_file_type(bid_file, DOCUMENT_EXTENSIONS, "投标文件")
+        for p in procurement_files:
+            ensure_file_type(p, DOCUMENT_EXTENSIONS, "采购文件")
+        for p in bid_files:
+            ensure_file_type(p, DOCUMENT_EXTENSIONS, "投标文件")
         final_scores_status = save_final_scores(final_scores_file)
 
         result = run_openbidkit_pipeline(
-            procurement_pdf,
-            bid_file,
+            procurement_files,
+            bid_files,
             skip_pp=request.form.get("skip_pp") == "on",
             skip_mimo=request.form.get("skip_mimo") == "on",
             final_scores_status=final_scores_status,

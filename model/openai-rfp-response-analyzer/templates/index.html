@@ -283,11 +283,11 @@
       <p>采购评分细则、投标响应片段、映射关系、响应特征和得扣分结构的数据集构建入口。</p>
 
       <form id="uploadForm" enctype="multipart/form-data">
-        <label for="procurementFile">采购文件</label>
-        <input type="file" id="procurementFile" name="procurement" accept=".pdf,.doc,.docx,.wps,.rtf,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" required>
+        <label for="procurementFile">采购文件（可多选）</label>
+        <input type="file" id="procurementFile" name="procurement" accept=".pdf,.doc,.docx,.wps,.rtf,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" multiple required>
 
-        <label for="bidFile">投标技术文件</label>
-        <input type="file" id="bidFile" name="bid" accept=".pdf,.doc,.docx,.wps,.rtf,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" required>
+        <label for="bidFile">投标技术文件（可多选）</label>
+        <input type="file" id="bidFile" name="bid" accept=".pdf,.doc,.docx,.wps,.rtf,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff" multiple required>
 
         <label for="finalScoresFile">最终得分文件（可选）</label>
         <input type="file" id="finalScoresFile" name="final_scores" accept=".json,.pdf,.doc,.docx,.wps,.rtf,.txt,.md,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff">
@@ -311,7 +311,7 @@
 
       <div class="panel" style="margin-top: 22px;">
         <h2>当前边界</h2>
-        <p>底层文档提取本来就是图片链路：PDF会先渲染为图片，图片会直接进入PP-StructureV3。Word/Excel等文件可以作为原始材料上传保存，直接结构化处理会逐步补转换器。最终得分文件也可能是图片，非JSON会先保存为原始得分文件。</p>
+        <p>底层文档提取本来就是图片链路：PDF会先渲染为图片，图片会直接进入PP-StructureV3。Word/Excel等文件可以作为原始材料上传保存，直接结构化处理会逐步补转换器。最终得分文件如果是图片/PDF/Word，会先抽文本并尝试自动结构化为 final_scores.json。</p>
       </div>
     </aside>
 
@@ -427,7 +427,8 @@
 
     function finalScoreStatusText(value) {
       if (value === 'uploaded') return '已保存新上传 final_scores.json';
-      if (value === 'uploaded_unstructured') return '已保存最终得分原始文件；需要结构化为 final_scores.json 后再跑得扣分分析';
+      if (value === 'uploaded_structured_from_source') return '已从最终得分原始文件自动生成 final_scores.json，并继续得扣分分析';
+      if (value === 'uploaded_unstructured') return '已保存最终得分原始文件；自动结构化失败，需要人工整理为 final_scores.json';
       if (value === 'existing') return '使用已有 final_scores.json';
       return '未提供 final_scores.json，已跳过得扣分分析';
     }

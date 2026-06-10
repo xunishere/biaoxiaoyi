@@ -18,7 +18,7 @@ export const PROVIDERS: ProviderInfo[] = [
     name: 'DeepSeek',
     color: '#4F6BF7',
     baseURL: 'https://api.deepseek.com',
-    models: ['deepseek-chat', 'deepseek-reasoner'],  // 仅作 fallback，实际从 API 拉取
+    models: ['deepseek-chat', 'deepseek-reasoner'],  // 静态模型列表：在用户未点拉取列表时作为初始 dropdown
     description: '性价比最高 · 中文能力强',
     defaultModel: 'deepseek-chat',
   },
@@ -66,6 +66,27 @@ export const PROVIDERS: ProviderInfo[] = [
     models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
     description: 'GPT 系列',
     defaultModel: 'gpt-4o-mini',
+  },
+  {
+    id: 'xiaomi-mimo',
+    name: '小米 MiMo · 按量付费',
+    color: '#FF6700',
+    baseURL: 'https://api.xiaomimimo.com/v1',
+    // 平台不暴露 /v1/models 端点，依赖此静态列表作为唯一来源
+    models: ['mimo-v2.5-pro', 'mimo-v2-pro', 'mimo-v2.5', 'mimo-v2-omni', 'mimo-v2-flash'],
+    description: '官方按量付费 · 不暴露 /v1/models',
+    defaultModel: 'mimo-v2.5-pro',
+  },
+  {
+    id: 'xiaomi-mimo-plan',
+    name: '小米 MiMo · 订阅版',
+    color: '#FF6700',
+    baseURL: 'https://token-plan-cn.xiaomimimo.com/v1',
+    // 订阅版 Token Plan 模型清单（来自订阅管理面板"套餐权益"实证）：4 个文本模型，无 mimo-v2-flash；TTS 系列在标书业务用不上故省略
+    models: ['mimo-v2.5-pro', 'mimo-v2-pro', 'mimo-v2.5', 'mimo-v2-omni'],
+    // 注意：订阅版 ToS 明示"仅限交互式使用，不可用于自动化脚本或应用后端"——使用风险自担
+    description: '订阅 Token Plan · 仅限交互式使用',
+    defaultModel: 'mimo-v2.5-pro',
   },
 ];
 

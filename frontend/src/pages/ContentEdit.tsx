@@ -11,7 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import {
   collectSseText, contentApi, ChapterContentRequest,
-  reviewApi, GapAnalysisResponse, ScoringTableResponse,
+  reviewApi, GapAnalysisResponse, ScoringTableResponse, ScoreItem,
   documentApi, getErrorMessage, mergeApi,
 } from '../services/api';
 import { saveAs } from 'file-saver';
@@ -38,6 +38,30 @@ interface GenProgress {
 }
 
 type PipelineStage = 'idle' | 'generating' | 'reviewing' | 'scoring' | 'optimizing' | 'done';
+
+// 上游瞬态错误（429 速率限制 / 502 后端转发的 LLM 偶发 JSON 错乱 / 503/504 上游不可用）
+const isTransientUpstreamError = (e: unknown): boolean => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const err = e as any;
+  const status = err?.response?.status;
+  const detail = String(err?.response?.data?.detail ?? err?.message ?? '');
+  if (status === 429 || status === 502 || status === 503 || status === 504) return true;
+  return /429|Too many requests|Too Many Requests|limitation|Bad Gateway|Gateway Timeout|JSON.*无效|JSON.*错误|格式无效/i.test(detail);
+};
+
+// 瞬态错误退避重试包装器（5s/10s/20s 三档）；其它错误立即抛
+const withRateLimitRetry = async <T,>(fn: () => Promise<T>, maxRetries = 3): Promise<T> => {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (!isTransientUpstreamError(e) || attempt === maxRetries) throw e;
+      const waitSec = 5 * Math.pow(2, attempt); // 5, 10, 20
+      await new Promise((r) => setTimeout(r, waitSec * 1000));
+    }
+  }
+  throw new Error('unreachable');
+};
 
 const ContentEdit: React.FC<ContentEditProps> = ({
   projectOverview,
@@ -121,6 +145,13 @@ const ContentEdit: React.FC<ContentEditProps> = ({
     setProgress(prev => ({ ...prev, total: tab === 'scoring' ? leafItemsScoring.length : tab === 'framework' ? leafItemsFramework.length : 0 }));
     setStage('idle');
   };
+  // mount 时根据初始 activeTab 恢复缓存（修复：刷新后 A tab 不显示缓存的缺陷/评分，需手动切去 B 再回 A）
+  useEffect(() => {
+    setGapResultState(loadReviewCache(`gap_${activeTab}`));
+    setScoreResultState(loadReviewCache(`score_${activeTab}`));
+    // 仅 mount 一次；后续 tab 切换由 switchTab 负责
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [referenceDoc, setReferenceDoc] = useState<string | null>(null);
   const [refFileName, setRefFileName] = useState('');
   const [showScrollToTop, setShowScrollToTop] = useState(false);
@@ -434,12 +465,14 @@ const ContentEdit: React.FC<ContentEditProps> = ({
     if (activeTab !== 'merged' && !activeLeafItems.length) return;
     setStage('reviewing'); setMessage(null);
     startTimer('gap');
+    // 后端 review_service.gap_analysis 内部已对全文按章节切分并按块处理；前端不再分批，避免破坏后端的逐章评估+汇总语义
+    // 上游瞬态错误（429/502/503/504）通过 withRateLimitRetry 自动重试
     try {
       const doc = getCurrentDocument();
-      const res = await reviewApi.gapAnalysis({
+      const res = await withRateLimitRetry(() => reviewApi.gapAnalysis({
         document_content: doc,
         scoring_criteria: techRequirements,
-      });
+      }));
       setGapResult(res.data);
       const elapsed = stopTimer();
       setStage('idle');
@@ -458,13 +491,15 @@ const ContentEdit: React.FC<ContentEditProps> = ({
     if (activeTab !== 'merged' && !activeLeafItems.length) return;
     setStage('scoring'); setMessage(null);
     startTimer('score');
+    // 后端 review_service.scoring_table 内部已并发逐章评估并汇总；前端不再分批，避免破坏后端的两阶段语义
+    // 上游瞬态错误（429/502/503/504）通过 withRateLimitRetry 自动重试
     try {
       const doc = getCurrentDocument();
-      const res = await reviewApi.scoringTable({
+      const res = await withRateLimitRetry(() => reviewApi.scoringTable({
         document_content: doc,
         scoring_criteria: techRequirements,
         gap_analysis_json: gapResult ? JSON.stringify(gapResult) : '',
-      });
+      }));
       setScoreResult(res.data);
       const elapsed = stopTimer();
       setStage('idle');
@@ -580,18 +615,24 @@ const ContentEdit: React.FC<ContentEditProps> = ({
     setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，耗时 ${formatDuration(elapsed)}，正在自动重新审查评分...` });
     syncAllState();
 
-    // 自动重新审查+评分，展示优化效果
+    // 自动重新审查+评分：与手动 ②③ 同样单次调用，让后端的内部分块/逐章评估机制工作
     try {
       const doc = getCurrentDocument();
-      const gapRes = await reviewApi.gapAnalysis({ document_content: doc, scoring_criteria: techRequirements });
-      setGapResult(gapRes.data);
-      const scoreRes = await reviewApi.scoringTable({
+      setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，正在缺口分析复查...` });
+      const gapRes = await withRateLimitRetry(() => reviewApi.gapAnalysis({
         document_content: doc, scoring_criteria: techRequirements,
-        gap_analysis_json: gapRes.data ? JSON.stringify(gapRes.data) : '',
-      });
-      setScoreResult(scoreRes.data);
+      }));
+      const newGap = gapRes.data;
+      setGapResult(newGap);
+      setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，缺口分析完成，正在评分...` });
+      const scoreRes = await withRateLimitRetry(() => reviewApi.scoringTable({
+        document_content: doc, scoring_criteria: techRequirements,
+        gap_analysis_json: JSON.stringify(newGap),
+      }));
+      const newScore = scoreRes.data;
+      setScoreResult(newScore);
       setStage('idle');
-      setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，耗时 ${formatDuration(elapsed)}，复查完成` });
+      setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，耗时 ${formatDuration(elapsed)}，复查完成（总分 ${newScore.total}/${newScore.max_total}）` });
       syncAllState();
     } catch {
       setMessage({ type: 'success', text: `已优化 ${weakItems.length} 个章节，耗时 ${formatDuration(elapsed)}（复查失败，请手动点②③）` });

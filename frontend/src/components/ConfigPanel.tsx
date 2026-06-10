@@ -32,9 +32,11 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onConfigChange }) => 
           data.provider = matched ? matched.id : 'custom';
         }
         const pid = data.provider || '';
-        // 从缓存恢复模型列表
+        // 从缓存恢复模型列表；缓存为空时回退到 providers.ts 静态列表（适配不暴露 /v1/models 的平台，如小米 MiMo）
         const cached = data.provider_models?.[pid] || [];
-        setModels(cached);
+        const prov = PROVIDERS.find((p) => p.id === pid);
+        const initialModels = cached.length > 0 ? cached : (prov?.models || []);
+        setModels(initialModels);
         // 从 provider_keys 恢复 Key
         if (pid && data.provider_keys?.[pid]) {
           data.api_key = data.provider_keys[pid];
@@ -66,14 +68,17 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onConfigChange }) => 
     const pm = localConfig.provider_models || {};
     const savedKey = keys[prov.id] || '';
     const cached = pm[prov.id] || [];
+    // dropdown 内容：缓存为空时回退到 providers.ts 静态列表（适配不暴露 /v1/models 的平台，如小米 MiMo）
+    const initialModels = cached.length > 0 ? cached : prov.models;
     setLocalConfig({
       ...localConfig,
       provider: prov.id,
       api_key: savedKey,
       base_url: prov.baseURL,
+      // 选中模型：缓存非空用 cached[0]，否则用 prov.defaultModel（保持新用户默认偏好不漂移）
       model_name: cached[0] || prov.defaultModel,
     });
-    setModels(cached);
+    setModels(initialModels);
   };
 
   const setApiKey = (key: string) => {
@@ -101,12 +106,17 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, onConfigChange }) => 
             }
             return next;
           });
+        } else {
+          // 平台不暴露 /v1/models 时返回空数组；保留 dropdown 当前显示（静态 fallback 或上次缓存）
+          setFetchError('该供应商未返回模型列表，可继续使用预置选项');
         }
       } else {
+        // 不清空 models，保留 dropdown 当前显示
         setFetchError(response.data.message || '获取失败，请检查 Key');
       }
     } catch {
-      setFetchError('网络错误，请检查 Key 和 URL');
+      // 不清空 models，保留 dropdown 当前显示
+      setFetchError('拉取失败，可继续使用预置选项或检查 Key/URL');
     }
     finally { setLoading(false); }
   };

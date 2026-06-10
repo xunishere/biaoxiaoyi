@@ -185,15 +185,8 @@ const OutlineEdit: React.FC<OutlineEditProps> = ({
 
       if (!outlineResult) throw new Error('未收到框架目录生成结果');
 
-      // 只保留技术部分（去掉商务/报价/资信等非技术章节）
-      const isTechnical = (title: string): boolean => {
-        const t = title.replace(/\s/g, '');
-        if (/商务|报价|资信|资格证明|信誉证明|营业执照|纳税|财务|开标|分项|投标书/.test(t)) return false;
-        return /技术|方案|服务|巡检|维护|备份|优化|故障|保障|安全|响应|对接|升级|应急|平台|摄像/.test(t);
-      };
-      const filteredOutline = (outlineResult as OutlineData).outline.filter(item => isTechnical(item.title));
-      outlineResult = { ...(outlineResult as OutlineData), outline: filteredOutline };
-
+      // "目录 B：按框架结构" 是招标方规定的完整投标文件框架，原样保留 LLM 输出；
+      // 商务/资信/报价等非技术章节如不需要可在 UI 中手动删除。
       onFrameworkOutlineGenerated(outlineResult as OutlineData);
       const elapsed = stopTimer();
       setMessage({ type: 'success', text: `框架结构目录生成完成，耗时 ${formatDuration(elapsed)}` });

@@ -31,14 +31,13 @@ npm start
 │       ├── services/        # 业务逻辑
 │       ├── models/          # 数据模型
 │       └── utils/           # 工具（OpenAI SDK封装、prompts、SSE）
-├── frontend/                # React 前端
-│   └── src/
-│       ├── pages/           # 页面组件
-│       ├── components/      # 通用组件
-│       ├── services/        # API 客户端
-│       ├── hooks/           # React Hooks
-│       └── utils/           # 工具（localStorage/IndexedDB持久化）
-└── build.py                 # PyInstaller 打包脚本
+└── frontend/                # React 前端
+    └── src/
+        ├── pages/           # 页面组件
+        ├── components/      # 通用组件
+        ├── services/        # API 客户端
+        ├── hooks/           # React Hooks
+        └── utils/           # 工具（localStorage/IndexedDB持久化）
 ```
 
 ## 工作流

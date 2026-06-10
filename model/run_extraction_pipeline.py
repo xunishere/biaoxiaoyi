@@ -69,12 +69,31 @@ SCORE_POINT_ANALYSIS_MD = OUT_DIR / "score_point_analysis.md"
 RENDER_DPI = 180
 MAX_FRAGMENT_CHARS = 1500
 FRAGMENT_OVERLAP_CHARS = 150
-SCORE_RANGE_PAGE_RE = re.compile(r"\b\d+(?:\.\d+)?\s*[~～]\s*\d+(?:\.\d+)?\b")
+MAPPING_CANDIDATE_LIMIT_MIMO = 30
+MAPPING_CANDIDATE_LIMIT_RULE_ONLY = 18
+MAPPING_STRUCTURAL_LINK_LIMIT = 18
+MAPPING_CANDIDATE_EXCERPT_LIMIT_MIMO = 900
+MAPPING_CANDIDATE_EXCERPT_LIMIT_RULE = 1200
+SCORE_RANGE_PAGE_RE = re.compile(r"(?<!\d)\d{1,3}(?:\.\d+)?\s*[~～\-—至]\s*\d{1,3}(?:\.\d+)?(?!\d)")
 SCORE_RANGE_CELL_RE = re.compile(r"^\s*\d+(?:\.\d+)?\s*[~～\-—至]\s*\d+(?:\.\d+)?\s*$")
+SCORE_RANGE_INLINE_RE = re.compile(r"(?<!\d)(\d+(?:\.\d+)?\s*[~～\-—至]\s*\d+(?:\.\d+)?)(?!\d)")
+SCORE_RANGE_WITH_TYPE_RE = re.compile(
+    r"0\s*[~～\-—至]\s*\d+(?:\.\d+)?\s*(?:主观分|客观分)"
+)
+SCORING_ROW_COMPACT_RE = re.compile(
+    r"(?<!\d)\d{1,2}[\u4e00-\u9fffA-Za-z（）()、]{2,40}"
+    r"0[~～\-—至]\d+(?:\.\d+)?(?:主观分|客观分)"
+)
+TEXT_SCORE_UNIT_ROW_RE = re.compile(
+    r"(?<!\d)(?P<num>\d{1,2})\s*"
+    r"(?P<name>[\u4e00-\u9fffA-Za-z（）()、]{2,30}?)\s*"
+    r"(?P<range>0\s*[~～\-—至]\s*\d+(?:\.\d+)?)\s*"
+    r"(?P<score_type>主观分|客观分)"
+)
 PAREN_SCORE_RE = re.compile(r"[（(]\s*\d+(?:\.\d+)?\s*分\s*[)）]")
 NOISE_RE = re.compile(r"^[A-Za-z0-9]$")
 CHAPTER_RE = re.compile(r"第[一二三四五六七八九十]+章\s+\S+")
-HEADER_TEXTS = {"评分项目", "分值区间", "评分办法"}
+HEADER_TEXTS = {"评分项目", "分值区间", "分值", "评分办法", "主/客观分", "主客观分", "评分要点及说明"}
 OBJECTIVE_KEYWORDS = [
     "报价",
     "公式",
@@ -304,9 +323,23 @@ def score_start_page(text: str) -> tuple[int, list[str]]:
     if "评分规则" in normalized:
         score += 3
         reasons.append("has_评分规则")
+    if "投标评分细则" in normalized:
+        score += 6
+        reasons.append("has_投标评分细则")
+    if "评分细则" in normalized and "具体评分细则" in normalized:
+        score += 4
+        reasons.append("has_具体评分细则")
     if all(term in normalized for term in ("评分项目", "分值区间", "评分办法")):
         score += 6
         reasons.append("has_table_headers")
+    if "评分项目" in normalized and "分值" in normalized and (
+        "主/客观分" in normalized or "主客观分" in normalized
+    ) and ("评分要点" in normalized or "评分要点及说明" in normalized):
+        score += 8
+        reasons.append("has_score_item_value_subjective_objective_headers")
+    if "客观分" in normalized and "主观分" in normalized:
+        score += 2
+        reasons.append("has_subjective_objective_terms")
     if range_count:
         score += min(range_count, 4)
         reasons.append(f"score_range_count={range_count}")
@@ -329,6 +362,14 @@ def score_continuation_page(text: str) -> tuple[int, list[str]]:
     if range_count:
         score += min(range_count * 2, 6)
         reasons.append(f"score_range_count={range_count}")
+    if "评分项目" in normalized and "分值" in normalized and (
+        "主/客观分" in normalized or "主客观分" in normalized
+    ):
+        score += 4
+        reasons.append("has_scoring_table_headers")
+    if "主观分" in normalized or "客观分" in normalized:
+        score += 1
+        reasons.append("has_subjective_or_objective_score_type")
     if "一、评审内容" in normalized:
         score += 2
         reasons.append("has_review_content")
@@ -554,6 +595,11 @@ def infer_column_boundaries(lines: list[Line], table_bbox: list[float] | None = 
     for line in lines:
         if line.text in HEADER_TEXTS:
             header_centers[line.text] = line.cx
+    score_type_header = header_centers.get("主/客观分", header_centers.get("主客观分"))
+    if "评分项目" in header_centers and "分值" in header_centers and score_type_header is not None:
+        left_mid = (header_centers["评分项目"] + header_centers["分值"]) / 2
+        right_mid = (header_centers["分值"] + score_type_header) / 2
+        return left_mid, right_mid
     if {"评分项目", "分值区间", "评分办法"}.issubset(header_centers):
         left_mid = (header_centers["评分项目"] + header_centers["分值区间"]) / 2
         right_mid = (header_centers["分值区间"] + header_centers["评分办法"]) / 2
@@ -598,6 +644,18 @@ def is_probable_unit_name(text: str) -> bool:
     return 2 <= len(text) <= 40
 
 
+def clean_unit_name_text(text: str) -> str:
+    return normalize_text(re.sub(r"^\s*\d+[、.．]?\s*", "", text))
+
+
+def extract_score_range_text(text: str) -> str:
+    clean = normalize_text(text)
+    if SCORE_RANGE_CELL_RE.match(clean):
+        return clean
+    match = SCORE_RANGE_INLINE_RE.search(clean)
+    return normalize_text(match.group(1)) if match else ""
+
+
 def process_scoring_row(
     row: list[Line],
     left_mid: float,
@@ -620,11 +678,13 @@ def process_scoring_row(
         by_col[line_column(line, left_mid, right_mid)].append(line)
 
     item_text = normalize_text(" ".join(line.text for line in by_col["item"]))
+    unit_name_text = clean_unit_name_text(item_text)
     range_text = normalize_text(" ".join(line.text for line in by_col["range"]))
+    score_range_text = extract_score_range_text(range_text)
     method_lines = by_col["method"]
 
-    if item_text and is_probable_unit_name(item_text) and SCORE_RANGE_CELL_RE.match(range_text):
-        current = ScoreUnitDraft(item_text, range_text, row[0].page, row[0].page)
+    if item_text and is_probable_unit_name(unit_name_text) and score_range_text:
+        current = ScoreUnitDraft(unit_name_text, score_range_text, row[0].page, row[0].page)
         for line in sorted(by_col["item"] + by_col["range"] + method_lines, key=lambda item: item.x1):
             current.add_line(line)
         units.append(current)
@@ -644,11 +704,11 @@ def process_scoring_row(
                 current.add_line(line)
         return current, pending_name
 
-    if item_text and is_probable_unit_name(item_text) and not range_text and not method_lines:
+    if item_text and is_probable_unit_name(unit_name_text) and not range_text and not method_lines:
         return current, by_col["item"][0]
 
-    if pending_name and SCORE_RANGE_CELL_RE.match(range_text):
-        current = ScoreUnitDraft(pending_name.text, range_text, pending_name.page, row[0].page)
+    if pending_name and score_range_text:
+        current = ScoreUnitDraft(clean_unit_name_text(pending_name.text), score_range_text, pending_name.page, row[0].page)
         current.add_line(pending_name)
         for line in sorted(by_col["range"] + method_lines, key=lambda item: item.x1):
             current.add_line(line)
@@ -717,6 +777,50 @@ def split_score_units_from_pp(scoring_pages: list[int]) -> dict[str, Any]:
 
     print(f"procurement score units: lines={len(all_lines)} units={len(units)}")
     return units_json
+
+
+def split_score_units_from_pdf_text(pdf_path: Path, page_start: int, page_end: int) -> dict[str, Any]:
+    """Fallback for text PDFs whose scoring table has reliable text but weak table geometry.
+
+    Typical header: 评分项目 / 分值 / 主客观分 / 评分要点及说明.
+    It keeps raw text only; semantic criterion splitting is still done downstream.
+    """
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    page_texts = [extract_page_text(pdf_path, page) for page in range(page_start, page_end + 1)]
+    raw_text = normalize_text("\n".join(page_texts))
+    matches = list(TEXT_SCORE_UNIT_ROW_RE.finditer(raw_text))
+    score_units: list[dict[str, Any]] = []
+    for index, match in enumerate(matches, start=1):
+        next_start = matches[index].start() if index < len(matches) else len(raw_text)
+        segment = normalize_text(raw_text[match.start() : next_start])
+        score_units.append(
+            {
+                "unit_id": f"TU-DRAFT-{index:03d}",
+                "unit_name": clean_unit_name_text(match.group("name")),
+                "score_range_text": normalize_text(match.group("range")),
+                "page_start": page_start,
+                "page_end": page_end,
+                "raw_text": segment,
+                "source_line_ids": [],
+                "warnings": ["from_pdf_text_scoring_table_fallback"],
+                "score_type_hint": match.group("score_type"),
+            }
+        )
+
+    result = {
+        "source": {
+            "pdf_path": relative_path(pdf_path),
+            "page_start": page_start,
+            "page_end": page_end,
+            "method": "pdf_text_scoring_table_row_regex_v0",
+            "task": "score_unit_text_fallback",
+        },
+        "score_units": score_units,
+    }
+    print(
+        f"pdf text score units fallback: pages={page_start}-{page_end} units={len(score_units)}"
+    )
+    return result
 
 
 def get_mimo_config() -> dict[str, str] | None:
@@ -852,6 +956,7 @@ def refine_score_units_with_mimo(units_json: dict[str, Any], force: bool = False
                 "unit_id": unit["unit_id"],
                 "unit_name": unit["unit_name"],
                 "score_range_text": unit["score_range_text"],
+                "score_type_hint": unit.get("score_type_hint"),
                 "page_start": unit["page_start"],
                 "page_end": unit["page_end"],
                 "source_line_ids": unit["source_line_ids"],
@@ -953,11 +1058,27 @@ def keyword_objective_hit(unit: dict[str, Any], criterion_name: str, raw_text: s
     return any(term in text for term in OBJECTIVE_KEYWORDS)
 
 
+def scoring_type_from_procurement_table(unit: dict[str, Any]) -> str | None:
+    hint = normalize_text(str(unit.get("score_type_hint") or ""))
+    if hint == "主观分":
+        return "subjective"
+    if hint == "客观分":
+        return "objective"
+    text = compact_text(" ".join([unit.get("raw_text", ""), unit.get("normalized_text", "")]))
+    # The source scoring table label is authoritative; it appears immediately after the score range.
+    if re.search(r"0\s*[~～\-—至]\s*\d+(?:\.\d+)?\s*主观分", text):
+        return "subjective"
+    if re.search(r"0\s*[~～\-—至]\s*\d+(?:\.\d+)?\s*客观分", text):
+        return "objective"
+    return None
+
+
 def build_rule_based_criteria(score_units: list[dict[str, Any]]) -> list[dict[str, Any]]:
     criteria: list[dict[str, Any]] = []
     for unit in score_units:
         unit_no = score_unit_index(unit["unit_id"])
         unit_text = score_unit_text(unit)
+        source_scoring_type = scoring_type_from_procurement_table(unit)
         review_content, review_standard = split_review_content(unit_text)
         scored_items = parse_scored_items(review_content)
         if not scored_items:
@@ -977,6 +1098,7 @@ def build_rule_based_criteria(score_units: list[dict[str, Any]]) -> list[dict[st
             if review_standard and review_standard != raw_text:
                 raw_text = normalize_text(f"{raw_text}\n二、评分标准：{review_standard}")
             objective_hit = keyword_objective_hit(unit, criterion_name, raw_text)
+            scoring_type = source_scoring_type or ("objective" if objective_hit else "subjective")
             criteria.append(
                 {
                     "criterion_id": f"PC-{unit_no:03d}-{item_index:02d}",
@@ -987,14 +1109,16 @@ def build_rule_based_criteria(score_units: list[dict[str, Any]]) -> list[dict[st
                     "feature": feature,
                     "evaluation_method": f"该细则最高{item['score_text']}，按采购文件评分标准判断",
                     "score_text": item["score_text"],
-                    "scoring_type": "objective" if objective_hit else "subjective",
+                    "scoring_type": scoring_type,
                     "raw_text": raw_text,
                     "source": {
                         "score_unit_page_start": unit.get("page_start"),
                         "score_unit_page_end": unit.get("page_end"),
                         "extraction_method": "rule_split_v0",
                         "scoring_type_source": (
-                            "keyword_objective" if objective_hit else "needs_model_review"
+                            "procurement_table_label"
+                            if source_scoring_type
+                            else "keyword_objective" if objective_hit else "needs_model_review"
                         ),
                     },
                 }
@@ -1877,6 +2001,58 @@ def fragment_length_penalty(fragment: dict[str, Any]) -> float:
     return 1.0 + math.log(char_count / MAX_FRAGMENT_CHARS)
 
 
+def fragment_scoring_artifact_reason(fragment: dict[str, Any]) -> str:
+    """Detect procurement scoring-table snippets that leaked into bid fragments.
+
+    These snippets are useful as trace material, but they should not compete with
+    real response text during procurement-to-bid mapping.
+    """
+    title_text = normalize_text(" / ".join(fragment.get("heading_path", [])))
+    body_text = normalize_text("\n".join([fragment.get("text", ""), fragment.get("table_text", "")]))
+    combined = normalize_text(f"{title_text}\n{body_text}")
+    compact = compact_text(combined)
+    if not combined:
+        return ""
+
+    if re.search(r"[.．]{5,}\s*\d{1,4}", combined):
+        return "table_of_contents_line"
+    if SCORE_RANGE_WITH_TYPE_RE.search(combined):
+        return "score_range_with_subjective_or_objective_type"
+    if SCORING_ROW_COMPACT_RE.search(compact):
+        return "compact_scoring_table_row"
+    if SCORE_RANGE_PAGE_RE.search(combined) and ("评审标准" in combined or "评分标准" in combined):
+        return "range_scored_review_standard"
+    if len(SCORE_RANGE_PAGE_RE.findall(combined)) >= 2 and ("是否" in combined or "标准评审" in combined):
+        return "multiple_range_scored_review_checks"
+    if PAREN_SCORE_RE.search(combined) and ("评审标准" in combined or "评分标准" in combined):
+        return "scored_review_standard"
+    if len(PAREN_SCORE_RE.findall(combined)) >= 2 and ("是否" in combined or "标准评审" in combined):
+        return "multiple_scored_review_checks"
+    if "一、评审内容" in combined and ("二、评审标准" in combined or "二、评分标准" in combined):
+        return "review_content_and_scoring_standard"
+    if "评审内容" in title_text and (SCORE_RANGE_PAGE_RE.search(combined) or PAREN_SCORE_RE.search(combined)):
+        return "review_content_heading_with_score"
+    if "评分项目" in combined and ("评分要点" in combined or "主观分" in combined or "客观分" in combined):
+        return "scoring_table_header"
+    return ""
+
+
+def is_scoring_table_artifact_fragment(fragment: dict[str, Any]) -> bool:
+    return bool(fragment_scoring_artifact_reason(fragment))
+
+
+def mapping_candidate_fragments(fragments: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    usable: list[dict[str, Any]] = []
+    excluded = 0
+    for fragment in fragments:
+        reason = fragment_scoring_artifact_reason(fragment)
+        if reason:
+            excluded += 1
+            continue
+        usable.append(fragment)
+    return usable, excluded
+
+
 def recall_candidate_fragments(
     criterion: dict[str, Any],
     fragments: list[dict[str, Any]],
@@ -1928,6 +2104,7 @@ def fragment_excerpt(fragment: dict[str, Any], terms: list[str], max_len: int = 
 def build_mapping_messages(
     criterion: dict[str, Any],
     candidates: list[dict[str, Any]],
+    excerpt_limit: int = MAPPING_CANDIDATE_EXCERPT_LIMIT_MIMO,
 ) -> list[dict[str, str]]:
     terms = criterion_terms(criterion)
     candidate_payload = []
@@ -1939,7 +2116,7 @@ def build_mapping_messages(
                 "heading_path": fragment["heading_path"],
                 "match_score": candidate["match_score"],
                 "matched_terms": candidate["matched_terms"],
-                "excerpt": fragment_excerpt(fragment, terms),
+                "excerpt": fragment_excerpt(fragment, terms, max_len=excerpt_limit),
             }
         )
 
@@ -1988,6 +2165,9 @@ def criterion_focus_terms(criterion: dict[str, Any]) -> list[str]:
         "综合",
         "评分",
         "评审",
+        "响应",
+        "响应内容",
+        "说明",
     }
     values = [
         criterion.get("criterion_name", ""),
@@ -2013,34 +2193,169 @@ def criterion_focus_terms(criterion: dict[str, Any]) -> list[str]:
     return deduped[:20]
 
 
+def criterion_subitem_terms(criterion: dict[str, Any]) -> list[str]:
+    raw_text = normalize_text(criterion.get("raw_text", ""))
+    if not raw_text:
+        return []
+    terms: list[str] = []
+
+    for match in re.finditer(
+        r"(?:^|[；;。]\s*|\s)\d+[、.．]\s*"
+        r"(?P<term>[^；;。]+?)"
+        r"(?:[（(]\s*0\s*[~～\-—至]\s*\d+(?:\.\d+)?\s*分\s*[)）]|[；;。]|$)",
+        raw_text,
+    ):
+        term = normalize_text(match.group("term"))
+        term = PAREN_SCORE_RE.sub("", term)
+        term = re.sub(r"[（(]\s*升级改造\s*[)）]", "", term)
+        term = re.sub(r"[（(]\s*国产化环境改造迁移\s*[)）]", "", term)
+        term = re.sub(r"[（(]\s*应用新建\s*[)）]", "", term)
+        term = normalize_text(term.strip(" ：:；;，,、"))
+        if 3 <= len(term) <= 40:
+            terms.append(term)
+
+    for part in re.split(r"[、,，；;。()/（）和及与等的或\s]+", raw_text):
+        part = normalize_text(part)
+        if 2 <= len(part) <= 18 and part not in {"评审内容", "评审标准", "评分标准", "主观分", "客观分"}:
+            if any(key in part for key in ["模块", "设计", "履历", "证书", "合同", "验收", "证明", "类似项目", "移动应用"]):
+                terms.append(part)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for term in terms:
+        compact = compact_text(term)
+        if compact and compact not in seen:
+            seen.add(compact)
+            deduped.append(term)
+    return deduped[:30]
+
+
+def expanded_criterion_focus_terms(criterion: dict[str, Any]) -> list[str]:
+    terms = criterion_focus_terms(criterion) + criterion_subitem_terms(criterion)
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for term in terms:
+        compact = compact_text(term)
+        if len(compact) < 2 or compact in seen:
+            continue
+        seen.add(compact)
+        deduped.append(term)
+    return deduped[:40]
+
+
+def criterion_score_value(criterion: dict[str, Any]) -> float:
+    match = re.search(r"(\d+(?:\.\d+)?)", criterion.get("score_text", "") or "")
+    return float(match.group(1)) if match else 0.0
+
+
+def is_broad_mapping_criterion(criterion: dict[str, Any]) -> bool:
+    raw_text = normalize_text(criterion.get("raw_text", ""))
+    subitems = criterion_subitem_terms(criterion)
+    return (
+        criterion.get("scoring_type") == "subjective"
+        and (
+            criterion_score_value(criterion) >= 5
+            or len(subitems) >= 2
+            or "团队综合能力" in raw_text
+        )
+    )
+
+
+TEAM_COMPREHENSIVE_EVIDENCE_TERMS = [
+    "项目组成员",
+    "团队人员",
+    "团队成员",
+    "履历",
+    "岗位证书",
+    "职业资格",
+    "相关工作经历",
+    "个人业绩",
+    "团队人员业绩",
+    "类似项目建设经验",
+    "承担过类似项目",
+    "用户证明",
+    "验收报告",
+]
+
+
+def team_comprehensive_hits(text: str) -> list[str]:
+    hits = keyword_hits(text, TEAM_COMPREHENSIVE_EVIDENCE_TERMS, limit=12)
+    compact = compact_text(text)
+    personnel_context = any(
+        token in compact for token in ["团队", "人员", "项目组成员", "履历", "岗位证书", "职业资格", "个人业绩"]
+    )
+    if not personnel_context:
+        return []
+    if hits == ["验收报告"] or hits == ["用户证明"]:
+        return []
+    return hits
+
+
+def is_form_or_navigation_heading(fragment: dict[str, Any]) -> bool:
+    title_text = normalize_text(" / ".join(fragment.get("heading_path", [])))
+    return any(
+        marker in title_text
+        for marker in [
+            "目录",
+            "开标一览表",
+            "投标函",
+            "授权委托书",
+            "资格条件响应表",
+            "实质性要求响应表",
+            "中小企业声明函",
+        ]
+    )
+
+
 def structural_rule_links(
     criterion: dict[str, Any],
     fragments: list[dict[str, Any]],
-    limit: int = 10,
+    limit: int = MAPPING_STRUCTURAL_LINK_LIMIT,
 ) -> list[dict[str, Any]]:
     unit_name = normalize_text(criterion.get("score_unit_name", ""))
     criterion_name = normalize_text(criterion.get("criterion_name", ""))
-    focus_terms = criterion_focus_terms(criterion)
+    focus_terms = expanded_criterion_focus_terms(criterion)
     links: list[dict[str, Any]] = []
     exact_links: list[dict[str, Any]] = []
 
     compact_unit_name = compact_text(unit_name)
+    compact_criterion_name = compact_text(criterion_name)
+    broad = is_broad_mapping_criterion(criterion)
     for fragment in fragments:
+        if is_scoring_table_artifact_fragment(fragment):
+            continue
         top_direction = normalize_text(fragment.get("top_score_direction", ""))
         title_text = compact_text(" ".join(fragment.get("heading_path", [])))
+        body_text = compact_text(" ".join([fragment.get("text", ""), fragment.get("table_text", "")]))[:4000]
+        combined_text = f"{title_text}{body_text}"
+        matched_terms = [
+            term for term in focus_terms if compact_text(term) and compact_text(term) in combined_text
+        ]
+
+        same_direction = False
         if unit_name:
             if top_direction == unit_name:
-                pass
-            elif not top_direction and compact_unit_name and compact_unit_name in title_text:
-                # 顶级方向缺失（常见于空标题/不规范标题片段）时回落到 heading_path 命中 unit_name。
-                pass
-            else:
+                same_direction = True
+            elif compact_unit_name and compact_unit_name in title_text:
+                same_direction = True
+            elif broad and compact_unit_name and compact_unit_name in body_text[:800]:
+                same_direction = True
+
+        if not same_direction:
+            if is_form_or_navigation_heading(fragment):
+                continue
+            if not (broad and matched_terms):
                 continue
 
-        matched_terms = [
-            term for term in focus_terms if compact_text(term) and compact_text(term) in title_text
-        ]
-        exact_match = bool(criterion_name and compact_text(criterion_name) in title_text)
+        if unit_name == "团队综合能力":
+            team_hits = team_comprehensive_hits(combined_text)
+            if not team_hits:
+                continue
+            for hit in team_hits:
+                if hit not in matched_terms:
+                    matched_terms.append(hit)
+
+        exact_match = bool(compact_criterion_name and compact_criterion_name in title_text)
         if exact_match and criterion_name not in matched_terms:
             matched_terms.insert(0, criterion_name)
         if not matched_terms and criterion_name == unit_name and compact_text(unit_name) in title_text:
@@ -2065,7 +2380,7 @@ def structural_rule_links(
         else:
             links.append(link)
 
-    selected = exact_links if exact_links else links
+    selected = exact_links + links
     return sorted(selected, key=lambda item: item["match_score"], reverse=True)[:limit]
 
 
@@ -2084,15 +2399,16 @@ def merge_links(primary: list[dict[str, Any]], secondary: list[dict[str, Any]], 
 def mimo_linked_fragments(
     criterion: dict[str, Any],
     candidates: list[dict[str, Any]],
+    excerpt_limit: int = MAPPING_CANDIDATE_EXCERPT_LIMIT_MIMO,
 ) -> list[dict[str, Any]]:
     config = get_mimo_config()
     if config is None:
         return []
     content = openai_compatible_chat(
         config,
-        build_mapping_messages(criterion, candidates),
+        build_mapping_messages(criterion, candidates, excerpt_limit=excerpt_limit),
         max_tokens=3000,
-        timeout_seconds=45,
+        timeout_seconds=90,
     )
     parsed = extract_json_object(content)
     candidate_by_id = {candidate["fragment"]["fragment_id"]: candidate for candidate in candidates}
@@ -2202,15 +2518,25 @@ def map_criteria_to_bid_fragments(
             print(f"cache vanished while waiting for lock, regenerating: {PROCUREMENT_BID_MAPPING_JSON}")
 
     mappings: list[dict[str, Any]] = []
+    usable_fragments, excluded_scoring_artifact_count = mapping_candidate_fragments(fragments)
+    candidate_limit = MAPPING_CANDIDATE_LIMIT_MIMO if use_mimo else MAPPING_CANDIDATE_LIMIT_RULE_ONLY
+    excerpt_limit = (
+        MAPPING_CANDIDATE_EXCERPT_LIMIT_MIMO if use_mimo else MAPPING_CANDIDATE_EXCERPT_LIMIT_RULE
+    )
+    print(
+        "mapping candidate pool: "
+        f"usable={len(usable_fragments)} excluded_scoring_artifacts={excluded_scoring_artifact_count} "
+        f"candidate_limit={candidate_limit}"
+    )
     for index, criterion in enumerate(criteria, start=1):
-        candidates = recall_candidate_fragments(criterion, fragments, limit=10)
-        structural_links = structural_rule_links(criterion, fragments)
+        candidates = recall_candidate_fragments(criterion, usable_fragments, limit=candidate_limit)
+        structural_links = structural_rule_links(criterion, usable_fragments)
         if not candidates:
             links = structural_links
         elif use_mimo:
             print(f"[{index}/{len(criteria)}] map {criterion['criterion_id']} candidates={len(candidates)}")
             try:
-                links = mimo_linked_fragments(criterion, candidates)
+                links = mimo_linked_fragments(criterion, candidates, excerpt_limit=excerpt_limit)
             except Exception as exc:
                 print(f"mapping MiMo failed for {criterion['criterion_id']}: {exc}")
                 links = []
@@ -2238,11 +2564,13 @@ def map_criteria_to_bid_fragments(
             "procurement_criteria": relative_path(PROCUREMENT_CRITERIA_JSON),
             "bid_response_fragments": relative_path(BID_FRAGMENTS_JSON),
             "method": (
-                "criterion_to_fragment_vector_recall_mimo_rerank_structural_fallback_v1"
+                "criterion_to_fragment_vector_recall_mimo_rerank_structural_fallback_v2"
                 if use_mimo
-                else "criterion_to_fragment_vector_recall_structural_hit_v1"
+                else "criterion_to_fragment_vector_recall_structural_hit_v2"
             ),
             "task": "binary_hit_mapping_without_scoring",
+            "candidate_limit": candidate_limit,
+            "excluded_scoring_artifact_fragment_count": excluded_scoring_artifact_count,
         },
         "mappings": mappings,
     }

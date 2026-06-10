@@ -353,9 +353,9 @@ export const expandApi = {
 
 export const reviewApi = {
   gapAnalysis: (data: GapAnalysisRequest) =>
-    api.post<GapAnalysisResponse>('/api/review/gap-analysis', data, { timeout: 600000 }),
+    api.post<GapAnalysisResponse>('/api/review/gap-analysis', data, { timeout: 1800000 }),  // 30 min — 后端内部已分块处理，给足时间
   scoringTable: (data: ScoringTableRequest) =>
-    api.post<ScoringTableResponse>('/api/review/scoring-table', data, { timeout: 600000 }),
+    api.post<ScoringTableResponse>('/api/review/scoring-table', data, { timeout: 1800000 }),  // 30 min — 后端内部已并发逐章评估+汇总
   optimizeChapterStream: (data: OptimizeChapterRequest) =>
     postJson('/api/review/optimize-chapter-stream', data, 300000), // 5分钟超时
 };

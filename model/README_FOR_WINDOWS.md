@@ -134,13 +134,27 @@ notepad .env
 ```ini
 MIMO_API_KEY=你的key
 MIMO_BASE_URL=https://你的OpenAI兼容地址/v1
-MIMO_MODEL=mimo-v2.5-pro
+MIMO_MODEL=deepseek-v4-pro
 
 # 可选：首次下载 PaddleOCR/HuggingFace 模型慢时使用
 HF_ENDPOINT=https://hf-mirror.com
 ```
 
 注意：`.env` 放在 `model\.env`，不是 `model\openai-rfp-response-analyzer\.env`。
+
+如果使用 DeepSeek 官方 API，推荐：
+
+```ini
+MIMO_BASE_URL=https://api.deepseek.com/v1
+MIMO_MODEL=deepseek-v4-pro
+```
+
+`deepseek-v4-pro` 质量更好，适合评分细则标注、映射判断、得扣分归因。  
+如果更在意速度和成本，可以换成：
+
+```ini
+MIMO_MODEL=deepseek-v4-flash
+```
 
 如果暂时不想消耗模型 API，可以在页面勾选：
 
@@ -163,6 +177,57 @@ cd C:\workspace\biaoxiaoyi\model\openai-rfp-response-analyzer
 
 ```text
 http://localhost:5001
+```
+
+默认会绑定：
+
+```text
+0.0.0.0:5001
+```
+
+也就是同一内网的其他机器可以通过本机 IPv4 访问：
+
+```text
+http://你的电脑IPv4:5001
+```
+
+查看本机 IPv4：
+
+```powershell
+ipconfig
+```
+
+找无线网卡或以太网卡下的 `IPv4 地址`，例如：
+
+```text
+192.168.1.23
+```
+
+其他机器访问：
+
+```text
+http://192.168.1.23:5001
+```
+
+### 8.1 Windows 内网启动脚本，推荐
+
+也可以直接运行：
+
+```powershell
+cd C:\workspace\biaoxiaoyi\model\openai-rfp-response-analyzer
+.\start_windows_lan.bat
+```
+
+这个脚本会做三件事：
+
+1. 设置 `HOST=0.0.0.0`、`PORT=5001`。
+2. 尝试添加 Windows 防火墙入站规则，放行 TCP `5001`。
+3. 打印本机可用的内网访问地址。
+
+如果添加防火墙规则失败，用管理员身份重新运行这个脚本，或者手动执行：
+
+```powershell
+netsh advfirewall firewall add rule name="Biaoxiaoyi Model 5001" dir=in action=allow protocol=TCP localport=5001
 ```
 
 如果要换端口：
@@ -328,7 +393,35 @@ $env:PORT=5002
 ..\.venv\Scripts\python.exe main.py
 ```
 
-### 12.7 Windows 原生 PaddleOCR/GPU 跑不通
+### 12.7 内网其他机器打不开 `http://你的IP:5001`
+
+按顺序检查：
+
+1. 服务启动时是否显示 `LAN access: http://...:5001`。
+2. Windows 防火墙是否放行 TCP `5001`。
+3. 两台机器是否在同一个局域网。
+4. 访问的是服务器电脑的 IPv4，不是 `127.0.0.1` 或 `localhost`。
+5. 公司/校园网络是否开启了 AP 隔离或客户端隔离。
+
+手动放行防火墙：
+
+```powershell
+netsh advfirewall firewall add rule name="Biaoxiaoyi Model 5001" dir=in action=allow protocol=TCP localport=5001
+```
+
+在服务器电脑上确认端口监听：
+
+```powershell
+netstat -ano | findstr :5001
+```
+
+应该能看到类似：
+
+```text
+0.0.0.0:5001
+```
+
+### 12.8 Windows 原生 PaddleOCR/GPU 跑不通
 
 优先使用 CPU 跑通：
 
@@ -346,4 +439,3 @@ pip install paddlepaddle
 ```text
 Ctrl + C
 ```
-

@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -102,7 +103,7 @@ def load_env_config() -> dict[str, str]:
     return {
         "api_key": os.getenv("MIMO_API_KEY", ""),
         "base_url": os.getenv("MIMO_BASE_URL", ""),
-        "model": os.getenv("MIMO_MODEL", "mimo-v2.5-pro"),
+        "model": os.getenv("MIMO_MODEL", "deepseek-v4-pro"),
     }
 
 
@@ -1614,6 +1615,45 @@ def manifest():
     return jsonify({"models": model_manifest(), "mimo": {k: v for k, v in load_env_config().items() if k != "api_key"}})
 
 
+def local_ipv4_addresses() -> list[str]:
+    addresses: list[str] = []
+    seen: set[str] = set()
+
+    def add(address: str) -> None:
+        if not address or address.startswith("127.") or address in seen:
+            return
+        seen.add(address)
+        addresses.append(address)
+
+    try:
+        host_name = socket.gethostname()
+        for item in socket.getaddrinfo(host_name, None, family=socket.AF_INET):
+            add(item[4][0])
+    except OSError:
+        pass
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            add(sock.getsockname()[0])
+    except OSError:
+        pass
+
+    return addresses
+
+
+def print_access_urls(host: str, port: int) -> None:
+    print(f"Local access: http://127.0.0.1:{port}", flush=True)
+    if host in {"0.0.0.0", "::"}:
+        addresses = local_ipv4_addresses()
+        for address in addresses:
+            print(f"LAN access:   http://{address}:{port}", flush=True)
+        if not addresses:
+            print("LAN access:   use this machine's IPv4 address and ensure firewall allows the port.", flush=True)
+
+
 if __name__ == "__main__":
+    host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", 5001))
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True, use_reloader=False)
+    print_access_urls(host, port)
+    app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)

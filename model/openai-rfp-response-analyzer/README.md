@@ -19,7 +19,7 @@
 │     ↓                                                 │     ↓                    │
 │ 跨文件重编号 TU-DRAFT-NNN                             │ 关键词召回 → 候选片段     │
 │     ↓                                                 │     ↓                    │
-│ MiMo OCR 文本规整 (mimo-v2.5-pro)                     │ 过滤空 section →         │
+│ LLM OCR 文本规整 (deepseek-v4-pro)                    │ 过滤空 section →         │
 │     ↓                                                 │     bid_response_fragments│
 │ 按 (3分) 正则拆 criterion                             │                          │
 │ + MiMo 补 object/feature/scoring_type                 │                          │
@@ -64,7 +64,7 @@
 |------|-------------|
 | 采购评分表定位 | Poppler `pdfinfo` + `pdftotext` + 关键词正则；图片直接作为评分表页 |
 | 采购评分表文档提取 | **PaddleOCR PP-StructureV3**（GPU + 表格识别），含 PP-DocLayout_plus-L / PP-OCRv5_server_det/rec / SLANeXt_wired / SLANet_plus / RT-DETR-L_wired/wireless_table_cell_det 等 |
-| 评分单元文本规整 | **MiMo `mimo-v2.5-pro`**（OpenAI 兼容 `/chat/completions`），仅机械整理 OCR 断行 |
+| 评分单元文本规整 | **DeepSeek V4 `deepseek-v4-pro`**（OpenAI 兼容 `/chat/completions`），仅机械整理 OCR 断行 |
 | 评分细则拆分与标注 | 规则正则切 `(N 分)` + MiMo 补 `object/feature/evaluation_method/scoring_type` |
 | 投标响应片段切分 | DOCX OOXML 标题解析 / PDF 文本标题规则切 / 图片引用占位 |
 | 采购-投标映射 | 关键词加权召回 (top-10) → MiMo 命中判断 → 结构规则兜底 (top_direction AND) |
@@ -124,8 +124,8 @@ pip install paddleocr paddlepaddle-gpu==3.3.1 -i https://www.paddlepaddle.org.cn
 
 ```ini
 MIMO_API_KEY=sk-xxx
-MIMO_BASE_URL=https://api.mimo.ai/v1   # 或其他 OpenAI 兼容 endpoint
-MIMO_MODEL=mimo-v2.5-pro
+MIMO_BASE_URL=https://api.deepseek.com/v1   # 或其他 OpenAI 兼容 endpoint
+MIMO_MODEL=deepseek-v4-pro
 ```
 
 首次 PP-StructureV3 启动会从 HuggingFace / Paddle BOS 拉模型，约 1.5 GB；建议先用 [`hf-mirror.com`](https://hf-mirror.com) 加速：`export HF_ENDPOINT=https://hf-mirror.com`。
@@ -137,7 +137,19 @@ cd model/openai-rfp-response-analyzer
 ../.venv/bin/python main.py
 ```
 
-监听 `:5001`。注意必须用 venv 的 python（否则 paddleocr / openai / flask 等都找不到）。
+监听 `0.0.0.0:5001`，同一内网其他机器可以访问：
+
+```text
+http://本机IPv4:5001
+```
+
+注意必须用 venv 的 python（否则 paddleocr / openai / flask 等都找不到）。Windows 推荐直接运行：
+
+```powershell
+.\start_windows_lan.bat
+```
+
+它会尝试放行 Windows 防火墙 TCP `5001`，并打印可访问的内网地址。
 
 ## 7. 命令行流水线（不走 UI）
 
@@ -183,7 +195,7 @@ cd model
           "heading_path": ["需求理解", "应用环境、体系结构需求与实施要求的理解", "应用环境需求的深度理解"],
           "evidence_text": "本项目立足闵行区绿化市容局生活垃圾分类智慧收运系统的实际应用场景...",
           "match_reason": "标题路径明确响应应用环境理解",
-          "decision_source": "mimo-v2.5-pro"
+          "decision_source": "deepseek-v4-pro"
         }
       ],
       "candidate_fragment_ids": ["BF-0002", "BF-0003", "..."]

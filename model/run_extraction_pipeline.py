@@ -837,7 +837,7 @@ def get_mimo_config() -> dict[str, str] | None:
     config = {
         "api_key": os.environ.get("MIMO_API_KEY") or file_values.get("MIMO_API_KEY", ""),
         "base_url": os.environ.get("MIMO_BASE_URL") or file_values.get("MIMO_BASE_URL", ""),
-        "model": os.environ.get("MIMO_MODEL") or file_values.get("MIMO_MODEL", "mimo-v2.5-pro"),
+        "model": os.environ.get("MIMO_MODEL") or file_values.get("MIMO_MODEL", "deepseek-v4-pro"),
     }
     if not config["api_key"] or not config["base_url"]:
         return None
